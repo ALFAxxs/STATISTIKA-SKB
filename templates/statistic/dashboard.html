@@ -1,0 +1,277 @@
+<!-- templates/statistic/dashboard.html -->
+{% extends 'base.html' %}
+{% block title %}Statistika{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">📊 Statistika paneli</h3>
+
+<!-- Filtrlar -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-3">
+        <select name="year" class="form-select">
+            <option value="">Barcha yillar</option>
+            {% for y in years %}
+                <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
+                    {{ y }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <select name="department" class="form-select">
+            <option value="">Barcha bo'limlar</option>
+            {% for dept in departments %}
+                <option value="{{ dept.pk }}"
+                    {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ dept.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Filtrlash</button>
+    </div>
+    <div class="col-md-2">
+        <a href="{% url 'statistics_dashboard' %}" class="btn btn-outline-secondary w-100">Tozalash</a>
+    </div>
+</form>
+
+<!-- Umumiy kartochkalar -->
+<div class="row g-3 mb-4">
+    <div class="col-md-2">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h2 class="text-primary">{{ total }}</h2>
+                <p class="mb-0 small">Jami bemorlar</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h2 class="text-success">{{ discharged }}</h2>
+                <p class="mb-0 small">Chiqarildi</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h2 class="text-danger">{{ deceased }}</h2>
+                <p class="mb-0 small">Vafot etdi</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h2 class="text-warning">{{ transferred }}</h2>
+                <p class="mb-0 small">O'tkazildi</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h2 class="text-info">{{ avg_days }}</h2>
+                <p class="mb-0 small">O'rtacha yotish (kun)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-secondary">
+            <div class="card-body text-center">
+                <h2 class="text-secondary">{{ non_resident_count }}</h2>
+                <p class="mb-0 small">Norezidentlar</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grafiklar -->
+<div class="row g-3 mb-4">
+    <!-- Oylik dinamika -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">Oylik qabul dinamikasi</div>
+            <div class="card-body">
+                <canvas id="monthlyChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Jins -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Jins bo'yicha</div>
+            <div class="card-body">
+                <canvas id="genderChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bo'lim -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Bo'limlar bo'yicha</div>
+            <div class="card-body">
+                <canvas id="deptChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yakun -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">Kasallanish yakuni</div>
+            <div class="card-body">
+                <canvas id="outcomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shoshilinch -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">Qabul turi</div>
+            <div class="card-body">
+                <canvas id="emergencyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bo'lim jadvali -->
+<div class="card mb-4">
+    <div class="card-header">Bo'limlar bo'yicha tafsilot</div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Bo'lim</th>
+                    <th>Bemorlar soni</th>
+                    <th>Ulushi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dept_stats %}
+                <tr>
+                    <td>{{ item.department__name|default:"Noma'lum" }}</td>
+                    <td>{{ item.count }}</td>
+                    <td>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar"
+                                 style="width: {% if total %}{% widthratio item.count total 100 %}%{% else %}0%{% endif %}">
+                                {% if total %}{% widthratio item.count total 100 %}%{% endif %}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted">Ma'lumot yo'q</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Export tugmalari -->
+<div class="d-flex gap-2 mb-5">
+    <a href="{% url 'export_excel' %}?year={{ selected_year }}&department={{ selected_dept }}"
+       class="btn btn-success">📥 Excel yuklab olish</a>
+    <a href="{% url 'export_pdf' %}?year={{ selected_year }}&department={{ selected_dept }}"
+       class="btn btn-danger">📄 PDF yuklab olish</a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const genderData = {{ gender_data|safe }};
+const monthlyLabels = {{ monthly_labels|safe }};
+const monthlyValues = {{ monthly_values|safe }};
+
+// Oylik grafik
+new Chart(document.getElementById('monthlyChart'), {
+    type: 'line',
+    data: {
+        labels: monthlyLabels,
+        datasets: [{
+            label: 'Bemorlar soni',
+            data: monthlyValues,
+            borderColor: '#0d6efd',
+            backgroundColor: 'rgba(13,110,253,0.1)',
+            tension: 0.3,
+            fill: true,
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+
+// Jins
+new Chart(document.getElementById('genderChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Erkak', 'Ayol'],
+        datasets: [{
+            data: [genderData.M, genderData.F],
+            backgroundColor: ['#0d6efd', '#e83e8c']
+        }]
+    },
+    options: { responsive: true }
+});
+
+// Yakun
+new Chart(document.getElementById('outcomeChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Chiqarildi', 'Vafot', "O'tkazildi"],
+        datasets: [{
+            data: [{{ discharged }}, {{ deceased }}, {{ transferred }}],
+            backgroundColor: ['#198754', '#dc3545', '#ffc107']
+        }]
+    },
+    options: { responsive: true }
+});
+
+// Shoshilinch
+new Chart(document.getElementById('emergencyChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Shoshilinch', 'Oddiy'],
+        datasets: [{
+            data: [{{ emergency_count }}, {{ non_emergency_count }}],
+            backgroundColor: ['#dc3545', '#6c757d']
+        }]
+    },
+    options: { responsive: true }
+});
+
+// Bo'limlar — dept_stats ni JSON ga o'girish
+const deptStats = [
+    {% for item in dept_stats %}
+        {"name": "{{ item.department__name|default:'Nomalum' }}", "count": {{ item.count }}}{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+        labels: deptStats.map(d => d.name),
+        datasets: [{
+            label: 'Bemorlar',
+            data: deptStats.map(d => d.count),
+            backgroundColor: '#0d6efd'
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } }
+    }
+});
+</script>
+{% endblock %}

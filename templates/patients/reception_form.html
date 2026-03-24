@@ -1,0 +1,289 @@
+<!-- templates/patients/reception_form.html -->
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <h3>🏥 {{ title }}</h3>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.errors %}
+            <div class="alert alert-danger">
+                <strong>Xatoliklar:</strong><br>
+                {% for field, errors in form.errors.items %}
+                    <div>• <b>{{ field }}</b>: {{ errors|join:", " }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 1. Asosiy ma'lumotlar -->
+            <div class="form-section">
+                <h5>👤 Bemor ma'lumotlari <span class="text-danger">*</span></h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">
+                            Kelgan sana va soat <span class="text-danger">*</span>
+                        </label>
+                        {{ form.admission_date }}
+                        <div class="text-danger small">{{ form.admission_date.errors }}</div>
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label fw-bold">
+                            To'liq ism-familiya <span class="text-danger">*</span>
+                        </label>
+                        {{ form.full_name }}
+                        <div class="text-danger small">{{ form.full_name.errors }}</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">
+                            Tug'ilgan sana <span class="text-danger">*</span>
+                        </label>
+                        {{ form.birth_date }}
+                        <div class="text-danger small">{{ form.birth_date.errors }}</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">
+                            Jinsi <span class="text-danger">*</span>
+                        </label>
+                        {{ form.gender }}
+                        <div class="text-danger small">{{ form.gender.errors }}</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Passport seriyasi</label>
+                        {{ form.passport_serial }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">JSHSHIR</label>
+                        {{ form.JSHSHIR }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Telefon raqami</label>
+                        {{ form.phone }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Ijtimoiy holat -->
+            <div class="form-section">
+                <h5>💼 Ijtimoiy holat <span class="text-danger">*</span></h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">
+                            Ijtimoiy holati <span class="text-danger">*</span>
+                        </label>
+                        {{ form.social_status }}
+                        <div class="text-danger small">{{ form.social_status.errors }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3" id="workplace-field">
+                        <label class="form-label">Ish joyi / O'quv joyi</label>
+                        {{ form.workplace }}
+                    </div>
+                    <div class="col-md-4 mb-3" id="position-field">
+                        <label class="form-label">Lavozimi</label>
+                        {{ form.position }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Yashash manzili -->
+            <div class="form-section">
+                <h5>📍 Yashash manzili <span class="text-muted small">(ixtiyoriy)</span></h5>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Davlat</label>
+                        {{ form.country }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Viloyat</label>
+                        <select name="region" id="id_region" class="form-select">
+                            <option value="">— Tanlang —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Tuman</label>
+                        <select name="district" id="id_district" class="form-select">
+                            <option value="">— Tanlang —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Shahar/Qishloq</label>
+                        <select name="city" id="id_city" class="form-select">
+                            <option value="">— Tanlang —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label">Ko'cha va uy raqami</label>
+                        {{ form.street_address }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Qabul ma'lumotlari -->
+            <div class="form-section">
+                <h5>🏥 Qabul ma'lumotlari</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            Qabulxona tashxisi <span class="text-danger">*</span>
+                        </label>
+                        {{ form.admission_diagnosis }}
+                        <div class="text-danger small">{{ form.admission_diagnosis.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            Yotqizilgan bo'lim <span class="text-danger">*</span>
+                        </label>
+                        {{ form.department }}
+                        <div class="text-danger small">{{ form.department.errors }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">
+                            Bemor kategoriyasi <span class="text-danger">*</span>
+                        </label>
+                        {{ form.patient_category }}
+                        <div class="text-danger small">{{ form.patient_category.errors }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Shifoxona turi</label>
+                        {{ form.hospital_type }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Kim tomonidan keltirilgan</label>
+                        {{ form.referral_type }}
+                    </div>
+                    <div class="col-md-6 mb-3" id="referral-org-field">
+                        <label class="form-label">Yo'llagan muassasa</label>
+                        {{ form.referral_organization }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Kasallanishdan keyin</label>
+                        {{ form.hours_after_illness }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Shoshilinch?</label>
+                        <div class="d-flex gap-3 mt-1">
+                            {% for choice in form.is_emergency %}
+                            <div class="form-check">
+                                {{ choice.tag }}
+                                <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                    {{ choice.choice_label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mb-5">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    ✅ Qabul qilish
+                </button>
+                <a href="{% url 'patient_list' %}" class="btn btn-secondary btn-lg">
+                    Bekor qilish
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Bootstrap stil
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+        if (!el.classList.contains('form-check-input')) {
+            el.classList.add('form-control');
+        }
+    });
+    document.querySelectorAll('select').forEach(el => {
+        el.classList.remove('form-control');
+        el.classList.add('form-select');
+    });
+
+    // Ijtimoiy holat bo'yicha ish/o'quv joyi ko'rsatish
+    const socialStatus = document.getElementById('id_social_status');
+    const workplaceField = document.getElementById('workplace-field');
+    const positionField = document.getElementById('position-field');
+
+    function toggleWorkplace() {
+        const val = socialStatus.value;
+        const showWorkplace = ['employed', 'student_higher', 'student_school'].includes(val);
+        const showPosition = val === 'employed';
+        workplaceField.style.display = showWorkplace ? 'block' : 'none';
+        positionField.style.display = showPosition ? 'block' : 'none';
+    }
+    if (socialStatus) {
+        socialStatus.addEventListener('change', toggleWorkplace);
+        toggleWorkplace();
+    }
+
+    // Yo'llanma turi bo'yicha muassasa ko'rsatish
+    const referralType = document.getElementById('id_referral_type');
+    const referralOrgField = document.getElementById('referral-org-field');
+
+    function toggleReferralOrg() {
+        if (!referralType || !referralOrgField) return;
+        const show = ['referral', 'liniya'].includes(referralType.value);
+        referralOrgField.style.display = show ? 'block' : 'none';
+    }
+    if (referralType) {
+        referralType.addEventListener('change', toggleReferralOrg);
+        toggleReferralOrg();
+    }
+
+    // Manzil cascade
+    const countryEl = document.getElementById('id_country');
+    if (countryEl) {
+        countryEl.addEventListener('change', function() {
+            const regionSelect = document.getElementById('id_region');
+            const districtSelect = document.getElementById('id_district');
+            const citySelect = document.getElementById('id_city');
+            regionSelect.innerHTML = '<option value="">— Tanlang —</option>';
+            districtSelect.innerHTML = '<option value="">— Tanlang —</option>';
+            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+            if (!this.value) return;
+            fetch(`/patients/ajax/regions/?country_id=${this.value}`)
+                .then(r => r.json())
+                .then(data => data.forEach(item => {
+                    regionSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                }));
+        });
+    }
+
+    const regionEl = document.getElementById('id_region');
+    if (regionEl) {
+        regionEl.addEventListener('change', function() {
+            const districtSelect = document.getElementById('id_district');
+            const citySelect = document.getElementById('id_city');
+            districtSelect.innerHTML = '<option value="">— Tanlang —</option>';
+            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+            if (!this.value) return;
+            fetch(`/patients/ajax/districts/?region_id=${this.value}`)
+                .then(r => r.json())
+                .then(data => data.forEach(item => {
+                    districtSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                }));
+        });
+    }
+
+    const districtEl = document.getElementById('id_district');
+    if (districtEl) {
+        districtEl.addEventListener('change', function() {
+            const citySelect = document.getElementById('id_city');
+            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+            if (!this.value) return;
+            fetch(`/patients/ajax/cities/?district_id=${this.value}`)
+                .then(r => r.json())
+                .then(data => data.forEach(item => {
+                    citySelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                }));
+        });
+    }
+});
+</script>
+{% endblock %}

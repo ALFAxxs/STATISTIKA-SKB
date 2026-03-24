@@ -1,0 +1,178 @@
+<!-- templates/patients/patient_list.html -->
+{% extends 'base.html' %}
+{% block title %}Bemorlar ro'yxati{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Bemorlar ro'yxati</h3>
+    {% if request.user.role != 'reception' and request.user.role != 'viewer' %}
+        <a href="{% url 'patient_create' %}" class="btn btn-primary">+ Yangi karta</a>
+    {% endif %}
+</div>
+
+<!-- Qidiruv va filter -->
+<form method="get" class="mb-3">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control"
+                       placeholder="Ism, bayonnoma raqami yoki passport..."
+                       value="{{ query }}">
+                <button type="submit" class="btn btn-outline-primary">Qidirish</button>
+            </div>
+        </div>
+
+        <!-- Status filteri -->
+        <div class="col-md-2">
+            <select name="status" class="form-select">
+                <option value="">Barcha statuslar</option>
+                <option value="registered"
+                    {% if selected_status == 'registered' %}selected{% endif %}>
+                    🟡 Registratsiya
+                </option>
+                <option value="admitted"
+                    {% if selected_status == 'admitted' %}selected{% endif %}>
+                    🔵 Yotqizilgan
+                </option>
+                <option value="completed"
+                    {% if selected_status == 'completed' %}selected{% endif %}>
+                    🟢 Yakunlangan
+                </option>
+            </select>
+        </div>
+
+        <!-- Yakun filteri — reception ga kerak emas -->
+        {% if request.user.role != 'reception' %}
+        <div class="col-md-2">
+            <select name="outcome" class="form-select">
+                <option value="">Barcha yakunlar</option>
+                <option value="discharged"
+                    {% if selected_outcome == 'discharged' %}selected{% endif %}>
+                    Chiqarildi
+                </option>
+                <option value="deceased"
+                    {% if selected_outcome == 'deceased' %}selected{% endif %}>
+                    Vafot etdi
+                </option>
+                <option value="transferred"
+                    {% if selected_outcome == 'transferred' %}selected{% endif %}>
+                    O'tkazildi
+                </option>
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        </div>
+        <div class="col-md-1">
+            <a href="{% url 'patient_list' %}" class="btn btn-outline-secondary w-100">✕</a>
+        </div>
+    </div>
+</form>
+
+<!-- Jami soni -->
+<p class="text-muted small mb-2">
+    Jami: <strong>{{ page_obj.paginator.count }}</strong> ta bemor
+</p>
+
+<div class="table-responsive">
+    <table class="table table-hover table-bordered">
+        <thead class="table-primary">
+            <tr>
+                <th>Bayonnoma №</th>
+                <th>Ism-familiya</th>
+                <th>Jinsi</th>
+                <th>Yotqizilgan sana</th>
+                <th>Bo'lim</th>
+                <th>Status</th>
+                {% if request.user.role != 'reception' %}
+                <th>Yakun</th>
+                <th>Shifokor</th>
+                {% endif %}
+                <th>Amallar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for patient in page_obj %}
+            <tr>
+                <td>{{ patient.medical_record_number }}</td>
+                <td>
+                    {{ patient.full_name }}
+                    {% if patient.resident_status == 'non_resident' %}
+                        <span class="badge bg-warning text-dark ms-1" title="Norezident">NR</span>
+                    {% endif %}
+                    {% if patient.patient_category == 'foreign' %}
+                        <span class="badge bg-info text-dark ms-1" title="Chet el">CE</span>
+                    {% endif %}
+                </td>
+                <td>{{ patient.get_gender_display }}</td>
+                <td>{{ patient.admission_date|date:"d.m.Y H:i" }}</td>
+                <td>{{ patient.department|default:"—" }}</td>
+                <td>
+                    {% if patient.status == 'registered' %}
+                        <span class="badge bg-warning text-dark">🟡 Registratsiya</span>
+                    {% elif patient.status == 'admitted' %}
+                        <span class="badge bg-primary">🔵 Yotqizilgan</span>
+                    {% elif patient.status == 'completed' %}
+                        <span class="badge bg-success">🟢 Yakunlangan</span>
+                    {% endif %}
+                </td>
+                {% if request.user.role != 'reception' %}
+                <td>
+                    {% if patient.outcome %}
+                    <span class="badge
+                        {% if patient.outcome == 'discharged' %}bg-success
+                        {% elif patient.outcome == 'deceased' %}bg-danger
+                        {% else %}bg-warning text-dark{% endif %}">
+                        {{ patient.get_outcome_display }}
+                    </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>{{ patient.attending_doctor|default:"—" }}</td>
+                {% endif %}
+                <td>
+                    <a href="{% url 'patient_detail' patient.pk %}"
+                       class="btn btn-sm btn-info">Ko'rish</a>
+                    <a href="{% url 'patient_edit' patient.pk %}"
+                       class="btn btn-sm btn-warning">Tahrir</a>
+                    {% if request.user.role == 'admin' or request.user.is_superuser %}
+                    <a href="{% url 'patient_delete' patient.pk %}"
+                       class="btn btn-sm btn-danger">O'chirish</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center text-muted py-3">Bemor topilmadi</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<nav>
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.previous_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}">←</a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link">
+                {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.next_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}">→</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
