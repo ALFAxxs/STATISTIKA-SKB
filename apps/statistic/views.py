@@ -4,49 +4,108 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Avg, Q
 from django.db.models.functions import TruncMonth
-from apps.patients.models import PatientCard, Department
+from apps.patients.models import (
+    PatientCard, Department, Doctor,
+    Organization, HospitalType
+)
 import json
 
 
 @login_required
 def statistics_dashboard(request):
 
-    # --- Filtrlar ---
+    # ==================== FILTERLAR ====================
     year = request.GET.get('year', '')
+    month = request.GET.get('month', '')
     department_id = request.GET.get('department', '')
+    doctor_id = request.GET.get('doctor', '')
+    outcome = request.GET.get('outcome', '')
+    status = request.GET.get('status', '')
+    gender = request.GET.get('gender', '')
+    patient_category = request.GET.get('patient_category', '')
+    resident_status = request.GET.get('resident_status', '')
+    referral_type = request.GET.get('referral_type', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
 
     qs = PatientCard.objects.all()
+
+    # Bo'lim bo'yicha cheklash (rol asosida)
+    from apps.users.decorators import department_filter
+    qs = department_filter(qs, request.user)
+
+    # Filterlarni qo'llash
     if year:
         qs = qs.filter(admission_date__year=year)
+    if month:
+        qs = qs.filter(admission_date__month=month)
     if department_id:
         qs = qs.filter(department_id=department_id)
+    if doctor_id:
+        qs = qs.filter(attending_doctor_id=doctor_id)
+    if outcome:
+        qs = qs.filter(outcome=outcome)
+    if status:
+        qs = qs.filter(status=status)
+    if gender:
+        qs = qs.filter(gender=gender)
+    if patient_category:
+        qs = qs.filter(patient_category=patient_category)
+    if resident_status:
+        qs = qs.filter(resident_status=resident_status)
+    if referral_type:
+        qs = qs.filter(referral_type=referral_type)
+    if date_from:
+        qs = qs.filter(admission_date__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(admission_date__date__lte=date_to)
 
-    # --- Umumiy sonlar ---
+    # ==================== UMUMIY SONLAR ====================
     total = qs.count()
     discharged = qs.filter(outcome='discharged').count()
     deceased = qs.filter(outcome='deceased').count()
     transferred = qs.filter(outcome='transferred').count()
+    registered = qs.filter(status='registered').count()
+    admitted = qs.filter(status='admitted').count()
+    completed = qs.filter(status='completed').count()
+    emergency_count = qs.filter(is_emergency=True).count()
+    non_emergency_count = qs.filter(is_emergency=False).count()
+    resident_count = qs.filter(resident_status='resident').count()
+    non_resident_count = qs.filter(resident_status='non_resident').count()
+    avg_days = qs.aggregate(avg=Avg('days_in_hospital'))['avg'] or 0
 
-    # --- Jins bo'yicha ---
+    # ==================== JINS BO'YICHA ====================
     gender_stats = qs.values('gender').annotate(count=Count('id'))
     gender_data = {'M': 0, 'F': 0}
     for item in gender_stats:
         if item['gender'] in gender_data:
             gender_data[item['gender']] = item['count']
 
-    # --- Bo'lim bo'yicha ---
-    dept_stats = (
-        qs.values('department__name')
-        .annotate(count=Count('id'))
-        .order_by('-count')
-    )
-    # None bo'lgan bo'limlarni filtrlaymiz
+    # ==================== BO'LIM BO'YICHA ====================
     dept_stats = [
-        item for item in dept_stats
+        item for item in
+        qs.values('department__name').annotate(count=Count('id')).order_by('-count')
         if item['department__name']
     ]
 
-    # --- Oylik dinamika ---
+    # ==================== SHIFOKOR BO'YICHA ====================
+    doctor_stats = [
+        item for item in
+        qs.values('attending_doctor__full_name').annotate(count=Count('id')).order_by('-count')[:10]
+        if item['attending_doctor__full_name']
+    ]
+
+    # ==================== KATEGORIYA BO'YICHA ====================
+    category_stats = qs.values('patient_category').annotate(count=Count('id'))
+    category_data = {
+        'railway': 0, 'paid': 0,
+        'non_resident': 0, 'foreign': 0
+    }
+    for item in category_stats:
+        if item['patient_category'] in category_data:
+            category_data[item['patient_category']] = item['count']
+
+    # ==================== OYLIK DINAMIKA ====================
     monthly_stats = (
         qs.annotate(month=TruncMonth('admission_date'))
         .values('month')
@@ -55,60 +114,77 @@ def statistics_dashboard(request):
     )
     monthly_labels = [
         item['month'].strftime('%Y-%m')
-        for item in monthly_stats
-        if item['month']
+        for item in monthly_stats if item['month']
     ]
     monthly_values = [
         item['count']
-        for item in monthly_stats
-        if item['month']
+        for item in monthly_stats if item['month']
     ]
 
-    # --- Ijtimoiy holat ---
+    # ==================== IJTIMOIY HOLAT ====================
     social_stats = (
         qs.values('social_status')
         .annotate(count=Count('id'))
         .order_by('-count')
     )
 
-    # --- Rezident / Norezident ---
-    resident_count = qs.filter(resident_status='resident').count()
-    non_resident_count = qs.filter(resident_status='non_resident').count()
+    # ==================== FILTER UCHUN RO'YXATLAR ====================
+    years = [d.year for d in PatientCard.objects.exclude(
+        admission_date=None
+    ).dates('admission_date', 'year', order='DESC')]
 
-    # --- Shoshilinch vs oddiy ---
-    emergency_count = qs.filter(is_emergency=True).count()
-    non_emergency_count = qs.filter(is_emergency=False).count()
+    if request.user.is_superuser or request.user.role == 'admin':
+        departments = Department.objects.filter(is_active=True)
+        doctors = Doctor.objects.filter(is_active=True).select_related('department')
+    else:
+        departments = Department.objects.filter(
+            pk=request.user.department.pk
+        ) if request.user.department else Department.objects.none()
+        doctors = Doctor.objects.filter(
+            is_active=True,
+            department=request.user.department
+        ) if request.user.department else Doctor.objects.none()
 
-    # --- O'rtacha yotish kunlari ---
-    avg_days = qs.aggregate(avg=Avg('days_in_hospital'))['avg'] or 0
-
-    # --- Yillar ro'yxati (filter uchun) ---  # ← tuzatildi
-    years = (
-        PatientCard.objects
-        .exclude(admission_date=None)
-        .dates('admission_date', 'year', order='DESC')
-    )
-    year_list = [d.year for d in years]
-
-    departments = Department.objects.filter(is_active=True)
+    # Joriy filter parametrlarini saqlash (Excel uchun)
+    current_filters = request.GET.urlencode()
 
     return render(request, 'statistic/dashboard.html', {
         'total': total,
         'discharged': discharged,
         'deceased': deceased,
         'transferred': transferred,
+        'registered': registered,
+        'admitted': admitted,
+        'completed': completed,
+        'emergency_count': emergency_count,
+        'non_emergency_count': non_emergency_count,
+        'resident_count': resident_count,
+        'non_resident_count': non_resident_count,
+        'avg_days': round(avg_days, 1),
+
         'gender_data': json.dumps(gender_data),
         'dept_stats': dept_stats,
+        'doctor_stats': doctor_stats,
+        'category_data': json.dumps(category_data),
         'monthly_labels': json.dumps(monthly_labels),
         'monthly_values': json.dumps(monthly_values),
         'social_stats': social_stats,
-        'resident_count': resident_count,
-        'non_resident_count': non_resident_count,
-        'emergency_count': emergency_count,
-        'non_emergency_count': non_emergency_count,
-        'avg_days': round(avg_days, 1),
-        'years': year_list,                          # ← tuzatildi
+
+        'years': years,
         'departments': departments,
+        'doctors': doctors,
+
         'selected_year': year,
+        'selected_month': month,
         'selected_dept': department_id,
+        'selected_doctor': doctor_id,
+        'selected_outcome': outcome,
+        'selected_status': status,
+        'selected_gender': gender,
+        'selected_category': patient_category,
+        'selected_resident': resident_status,
+        'selected_referral': referral_type,
+        'date_from': date_from,
+        'date_to': date_to,
+        'current_filters': current_filters,
     })

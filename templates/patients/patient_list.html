@@ -9,22 +9,23 @@
         <a href="{% url 'patient_create' %}" class="btn btn-primary">+ Yangi karta</a>
     {% endif %}
 </div>
-
-<!-- Qidiruv va filter -->
-<form method="get" class="mb-3">
+<form method="get" class="mb-4">
     <div class="row g-2">
-        <div class="col-md-5">
+
+        <!-- Qidiruv -->
+        <div class="col-md-12 mb-1">
             <div class="input-group">
                 <input type="text" name="q" class="form-control"
                        placeholder="Ism, bayonnoma raqami yoki passport..."
                        value="{{ query }}">
-                <button type="submit" class="btn btn-outline-primary">Qidirish</button>
+                <button type="submit" class="btn btn-primary">🔍 Qidirish</button>
+                <a href="{% url 'patient_list' %}" class="btn btn-outline-secondary">✕ Tozalash</a>
             </div>
         </div>
 
-        <!-- Status filteri -->
+        <!-- Status -->
         <div class="col-md-2">
-            <select name="status" class="form-select">
+            <select name="status" class="form-select form-select-sm">
                 <option value="">Barcha statuslar</option>
                 <option value="registered"
                     {% if selected_status == 'registered' %}selected{% endif %}>
@@ -41,10 +42,10 @@
             </select>
         </div>
 
-        <!-- Yakun filteri — reception ga kerak emas -->
+        <!-- Yakun -->
         {% if request.user.role != 'reception' %}
         <div class="col-md-2">
-            <select name="outcome" class="form-select">
+            <select name="outcome" class="form-select form-select-sm">
                 <option value="">Barcha yakunlar</option>
                 <option value="discharged"
                     {% if selected_outcome == 'discharged' %}selected{% endif %}>
@@ -62,14 +63,46 @@
         </div>
         {% endif %}
 
-        <div class="col-md-1">
-            <button type="submit" class="btn btn-primary w-100">Filter</button>
+        <!-- Bo'lim — faqat admin -->
+        {% if request.user.role == 'admin' or request.user.is_superuser %}
+        <div class="col-md-3">
+            <select name="department" class="form-select form-select-sm">
+                <option value="">Barcha bo'limlar</option>
+                {% for dept in departments %}
+                    <option value="{{ dept.pk }}"
+                        {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ dept.name }}
+                    </option>
+                {% endfor %}
+            </select>
         </div>
-        <div class="col-md-1">
-            <a href="{% url 'patient_list' %}" class="btn btn-outline-secondary w-100">✕</a>
+        {% endif %}
+
+        <!-- Shifokor -->
+        {% if request.user.role != 'reception' %}
+        <div class="col-md-3">
+            <select name="doctor" class="form-select form-select-sm">
+                <option value="">Barcha shifokorlar</option>
+                {% for doc in doctors %}
+                    <option value="{{ doc.pk }}"
+                        {% if selected_doctor == doc.pk|stringformat:"s" %}selected{% endif %}>
+                        {{ doc.full_name }}
+                        {% if request.user.role == 'admin' or request.user.is_superuser %}
+                            ({{ doc.department }})
+                        {% endif %}
+                    </option>
+                {% endfor %}
+            </select>
         </div>
+        {% endif %}
+
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+        </div>
+
     </div>
 </form>
+
 
 <!-- Jami soni -->
 <p class="text-muted small mb-2">
@@ -152,13 +185,14 @@
 </div>
 
 <!-- Pagination -->
+<!-- Pagination -->
 {% if page_obj.has_other_pages %}
 <nav>
     <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link"
-               href="?page={{ page_obj.previous_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}">←</a>
+               href="?page={{ page_obj.previous_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}&department={{ selected_dept }}&doctor={{ selected_doctor }}">←</a>
         </li>
         {% endif %}
         <li class="page-item active">
@@ -169,7 +203,7 @@
         {% if page_obj.has_next %}
         <li class="page-item">
             <a class="page-link"
-               href="?page={{ page_obj.next_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}">→</a>
+               href="?page={{ page_obj.next_page_number }}&q={{ query }}&status={{ selected_status }}&outcome={{ selected_outcome }}&department={{ selected_dept }}&doctor={{ selected_doctor }}">→</a>
         </li>
         {% endif %}
     </ul>

@@ -4,7 +4,8 @@ from django.contrib import admin
 from .models import (
     PatientCard, DeathCause, SurgicalOperation,
     Organization, Department, Doctor, DischargeConclusion,
-    Country, Region, District, City, OperationType
+    Country, Region, District, City, Village,
+    HospitalType, OperationType, ICD10Code      # ← qo'shish
 )
 
 # ==================== INLINE ADMINLAR ====================
@@ -12,7 +13,8 @@ from .models import (
 class SurgicalOperationInline(admin.TabularInline):
     model = SurgicalOperation
     extra = 1
-    fields = ['operation_date', 'operation_name', 'complication']
+    fields = ['operation_date', 'operation_type', 'anesthesia', 'complication']
+
 
 class DeathCauseInline(admin.StackedInline):
     model = DeathCause
@@ -23,38 +25,37 @@ class DeathCauseInline(admin.StackedInline):
         'main_disease_code', 'other_significant_conditions'
     ]
 
+
 # ==================== ASOSIY ADMIN ====================
 
 @admin.register(PatientCard)
 class PatientCardAdmin(admin.ModelAdmin):
     inlines = [SurgicalOperationInline, DeathCauseInline]
-
     list_display = [
         'medical_record_number', 'full_name', 'gender',
-        'admission_date', 'department', 'outcome', 'attending_doctor'
+        'admission_date', 'department', 'status', 'outcome', 'attending_doctor'
     ]
-
     list_filter = [
-        'gender', 'outcome', 'department',
+        'gender', 'outcome', 'status', 'department',
         'social_status', 'is_emergency', 'is_paid',
-        'admission_count', 'is_war_veteran', 'resident_status'
+        'admission_count', 'is_war_veteran', 'resident_status',
+        'patient_category'
     ]
-
-    search_fields = [
-        'full_name', 'medical_record_number', 'passport_serial'
-    ]
-
+    search_fields = ['full_name', 'medical_record_number', 'passport_serial']
     readonly_fields = ['created_at', 'updated_at']
-
     fieldsets = (
+        ("Bemor statusi", {
+            'fields': ('status', 'registered_by')
+        }),
         ("Bemor ma'lumotlari", {
             'fields': (
                 'medical_record_number', 'full_name', 'gender',
                 'birth_date', 'social_status', 'passport_serial',
-                'resident_status',                          # ← address o'rniga
+                'JSHSHIR', 'phone', 'resident_status', 'patient_category',
+                'workplace', 'position',
             )
         }),
-        ("Yashash manzili", {                              # ← yangi sektsiya
+        ("Yashash manzili", {
             'fields': (
                 'country', 'region', 'district', 'city',
                 'village', 'street_address',
@@ -65,14 +66,13 @@ class PatientCardAdmin(admin.ModelAdmin):
                 'referral_type', 'referral_organization',
                 'referring_diagnosis', 'admission_diagnosis',
                 'hours_after_illness', 'is_emergency', 'is_paid',
-                'admission_date', 'department', 'admission_count'
+                'hospital_type', 'admission_date', 'department', 'admission_count'
             )
         }),
         ("Chiqish ma'lumotlari", {
             'fields': (
                 'days_in_hospital', 'outcome',
-                'discharge_conclusion',                     # ← qo'shildi
-                'discharge_date',
+                'discharge_conclusion', 'discharge_date',
             )
         }),
         ("Yakuniy tashxis", {
@@ -100,17 +100,25 @@ class PatientCardAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(DischargeConclusion)
-class DischargeConclusionAdmin(admin.ModelAdmin):
+@admin.register(HospitalType)
+class HospitalTypeAdmin(admin.ModelAdmin):
     list_display = ['name', 'is_active']
     list_editable = ['is_active']
     search_fields = ['name']
+
 
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
     list_display = ['code', 'name', 'is_active']
     list_editable = ['is_active']
     search_fields = ['code', 'name']
+
+
+@admin.register(DischargeConclusion)
+class DischargeConclusionAdmin(admin.ModelAdmin):
+    list_display = ['name', 'is_active']
+    list_editable = ['is_active']
+    search_fields = ['name']
 
 
 @admin.register(Organization)
@@ -158,3 +166,10 @@ class CityAdmin(admin.ModelAdmin):
     list_display = ['name', 'district']
     search_fields = ['name']
     list_filter = ['district']
+
+
+@admin.register(ICD10Code)
+class ICD10CodeAdmin(admin.ModelAdmin):
+    list_display = ['code', 'title_uz', 'category']
+    search_fields = ['code', 'title_uz']
+    list_filter = ['category']

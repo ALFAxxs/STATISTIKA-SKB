@@ -15,25 +15,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from apps.patients.models import PatientCard
 
 
-def get_filtered_queryset(request):
-    qs = PatientCard.objects.select_related(
-        'department', 'attending_doctor', 'referral_organization',
-        'country', 'region', 'district', 'city', 'discharge_conclusion'
-    ).prefetch_related(
-        'operations__operation_type'
-    ).order_by('admission_date')
-
-    year = request.GET.get('year')
-    dept = request.GET.get('department')
-
-    if year:
-        qs = qs.filter(admission_date__year=year)
-    if dept:
-        qs = qs.filter(department_id=dept)
-
-    return qs
-
-
 def get_stats_queryset(request):
     """Statistika uchun alohida queryset — prefetch yo'q"""
     qs = PatientCard.objects.all()
@@ -252,8 +233,8 @@ def export_pdf(request):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        rightMargin=1*cm, leftMargin=1*cm,
-        topMargin=1.5*cm, bottomMargin=1*cm
+        rightMargin=1 * cm, leftMargin=1 * cm,
+        topMargin=1.5 * cm, bottomMargin=1 * cm
     )
 
     styles = getSampleStyleSheet()
@@ -270,7 +251,7 @@ def export_pdf(request):
     elements.append(Paragraph(
         "Shifoxonadan chiqarilganlar statistik ro'yxati", title_style
     ))
-    elements.append(Spacer(1, 0.3*cm))
+    elements.append(Spacer(1, 0.3 * cm))
 
     table_headers = [
         "№", "Bayonnoma", "Ism-familiya", "Jins", "Tug'ilgan\nsana",
@@ -300,8 +281,8 @@ def export_pdf(request):
         table_data.append(row)
 
     col_widths = [
-        1*cm, 2.5*cm, 4.5*cm, 1.2*cm, 2.2*cm,
-        3.5*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2.5*cm, 1.8*cm, 3.8*cm
+        1 * cm, 2.5 * cm, 4.5 * cm, 1.2 * cm, 2.2 * cm,
+        3.5 * cm, 2.5 * cm, 1.5 * cm, 2.5 * cm, 2.5 * cm, 1.8 * cm, 3.8 * cm
     ]
 
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -326,3 +307,61 @@ def export_pdf(request):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="bemorlar_royxati.pdf"'
     return response
+
+
+# apps/statistic/exports.py — get_filtered_queryset yangilash
+
+def get_filtered_queryset(request):
+    from apps.users.decorators import department_filter
+
+    qs = PatientCard.objects.select_related(
+        'department', 'attending_doctor', 'referral_organization',
+        'country', 'region', 'district', 'city',
+        'discharge_conclusion'
+    ).prefetch_related(
+        'operations__operation_type'
+    ).order_by('admission_date')
+
+    # Rol bo'yicha cheklash
+    qs = department_filter(qs, request.user)
+
+    # Barcha filterlar
+    year = request.GET.get('year')
+    month = request.GET.get('month')
+    dept = request.GET.get('department')
+    doctor = request.GET.get('doctor')
+    outcome = request.GET.get('outcome')
+    status = request.GET.get('status')
+    gender = request.GET.get('gender')
+    patient_category = request.GET.get('patient_category')
+    resident_status = request.GET.get('resident_status')
+    referral_type = request.GET.get('referral_type')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+
+    if year:
+        qs = qs.filter(admission_date__year=year)
+    if month:
+        qs = qs.filter(admission_date__month=month)
+    if dept:
+        qs = qs.filter(department_id=dept)
+    if doctor:
+        qs = qs.filter(attending_doctor_id=doctor)
+    if outcome:
+        qs = qs.filter(outcome=outcome)
+    if status:
+        qs = qs.filter(status=status)
+    if gender:
+        qs = qs.filter(gender=gender)
+    if patient_category:
+        qs = qs.filter(patient_category=patient_category)
+    if resident_status:
+        qs = qs.filter(resident_status=resident_status)
+    if referral_type:
+        qs = qs.filter(referral_type=referral_type)
+    if date_from:
+        qs = qs.filter(admission_date__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(admission_date__date__lte=date_to)
+
+    return qs

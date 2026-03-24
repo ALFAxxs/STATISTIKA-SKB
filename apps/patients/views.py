@@ -256,6 +256,8 @@ def patient_card_pdf(request, pk):
 
 # ==================== PATIENT VIEWS ====================
 
+# apps/patients/views.py — patient_list view
+
 @login_required
 def patient_list(request):
     qs = PatientCard.objects.select_related(
@@ -289,9 +291,28 @@ def patient_list(request):
         qs = qs.filter(outcome=outcome)
 
     # Bo'lim filteri (faqat admin)
-    department = request.GET.get('department', '')
-    if department and (request.user.is_superuser or request.user.role == 'admin'):
-        qs = qs.filter(department_id=department)
+    dept_filter = request.GET.get('department', '')
+    if dept_filter and (request.user.is_superuser or request.user.role == 'admin'):
+        qs = qs.filter(department_id=dept_filter)
+
+    # Shifokor filteri
+    doctor_filter = request.GET.get('doctor', '')
+    if doctor_filter:
+        qs = qs.filter(attending_doctor_id=doctor_filter)
+
+    # Filter uchun ro'yxatlar
+    from .models import Department, Doctor
+    if request.user.is_superuser or request.user.role == 'admin':
+        departments = Department.objects.filter(is_active=True)
+    else:
+        departments = Department.objects.filter(
+            pk=request.user.department.pk
+        ) if request.user.department else Department.objects.none()
+
+    doctors = Doctor.objects.filter(is_active=True).select_related('department')
+    if not request.user.is_superuser and request.user.role != 'admin':
+        if request.user.department:
+            doctors = doctors.filter(department=request.user.department)
 
     paginator = Paginator(qs, 20)
     page = paginator.get_page(request.GET.get('page'))
@@ -301,6 +322,10 @@ def patient_list(request):
         'query': query,
         'selected_status': status,
         'selected_outcome': outcome,
+        'selected_dept': dept_filter,
+        'selected_doctor': doctor_filter,
+        'departments': departments,
+        'doctors': doctors,
     })
 
 

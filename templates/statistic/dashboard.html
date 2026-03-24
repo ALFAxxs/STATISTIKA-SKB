@@ -1,106 +1,266 @@
-<!-- templates/statistic/dashboard.html -->
 {% extends 'base.html' %}
 {% block title %}Statistika{% endblock %}
 
 {% block content %}
-<h3 class="mb-4">📊 Statistika paneli</h3>
+<h3 class="mb-3">📊 Statistika paneli</h3>
 
-<!-- Filtrlar -->
-<form method="get" class="row g-2 mb-4">
-    <div class="col-md-3">
-        <select name="year" class="form-select">
-            <option value="">Barcha yillar</option>
-            {% for y in years %}
-                <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
-                    {{ y }}
-                </option>
-            {% endfor %}
-        </select>
+<!-- ==================== FILTERLAR ==================== -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <strong>🔍 Filterlar</strong>
     </div>
-    <div class="col-md-4">
-        <select name="department" class="form-select">
-            <option value="">Barcha bo'limlar</option>
-            {% for dept in departments %}
-                <option value="{{ dept.pk }}"
-                    {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>
-                    {{ dept.name }}
-                </option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-2">
-        <button type="submit" class="btn btn-primary w-100">Filtrlash</button>
-    </div>
-    <div class="col-md-2">
-        <a href="{% url 'statistics_dashboard' %}" class="btn btn-outline-secondary w-100">Tozalash</a>
-    </div>
-</form>
+    <div class="card-body">
+        <form method="get">
+            <div class="row g-2">
 
-<!-- Umumiy kartochkalar -->
-<div class="row g-3 mb-4">
+                <!-- Sana oralig'i -->
+                <div class="col-md-2">
+                    <label class="form-label small">Boshlanish sanasi</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm"
+                           value="{{ date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Tugash sanasi</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm"
+                           value="{{ date_to }}">
+                </div>
+
+                <!-- Yil -->
+                <div class="col-md-1">
+                    <label class="form-label small">Yil</label>
+                    <select name="year" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        {% for y in years %}
+                            <option value="{{ y }}"
+                                {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
+                                {{ y }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Oy -->
+                <div class="col-md-1">
+                    <label class="form-label small">Oy</label>
+                    <select name="month" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        {% for m in "123456789101112"|make_list %}{% endfor %}
+                        <option value="1" {% if selected_month == '1' %}selected{% endif %}>Yanvar</option>
+                        <option value="2" {% if selected_month == '2' %}selected{% endif %}>Fevral</option>
+                        <option value="3" {% if selected_month == '3' %}selected{% endif %}>Mart</option>
+                        <option value="4" {% if selected_month == '4' %}selected{% endif %}>Aprel</option>
+                        <option value="5" {% if selected_month == '5' %}selected{% endif %}>May</option>
+                        <option value="6" {% if selected_month == '6' %}selected{% endif %}>Iyun</option>
+                        <option value="7" {% if selected_month == '7' %}selected{% endif %}>Iyul</option>
+                        <option value="8" {% if selected_month == '8' %}selected{% endif %}>Avgust</option>
+                        <option value="9" {% if selected_month == '9' %}selected{% endif %}>Sentabr</option>
+                        <option value="10" {% if selected_month == '10' %}selected{% endif %}>Oktabr</option>
+                        <option value="11" {% if selected_month == '11' %}selected{% endif %}>Noyabr</option>
+                        <option value="12" {% if selected_month == '12' %}selected{% endif %}>Dekabr</option>
+                    </select>
+                </div>
+
+                <!-- Bo'lim -->
+                {% if request.user.role == 'admin' or request.user.is_superuser %}
+                <div class="col-md-2">
+                    <label class="form-label small">Bo'lim</label>
+                    <select name="department" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept.pk }}"
+                                {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ dept.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Shifokor -->
+                <div class="col-md-2">
+                    <label class="form-label small">Shifokor</label>
+                    <select name="doctor" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        {% for doc in doctors %}
+                            <option value="{{ doc.pk }}"
+                                {% if selected_doctor == doc.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ doc.full_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Yakun -->
+                <div class="col-md-2">
+                    <label class="form-label small">Yakun</label>
+                    <select name="outcome" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="discharged" {% if selected_outcome == 'discharged' %}selected{% endif %}>Chiqarildi</option>
+                        <option value="deceased" {% if selected_outcome == 'deceased' %}selected{% endif %}>Vafot etdi</option>
+                        <option value="transferred" {% if selected_outcome == 'transferred' %}selected{% endif %}>O'tkazildi</option>
+                    </select>
+                </div>
+
+                <!-- Status -->
+                <div class="col-md-2">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="registered" {% if selected_status == 'registered' %}selected{% endif %}>🟡 Registratsiya</option>
+                        <option value="admitted" {% if selected_status == 'admitted' %}selected{% endif %}>🔵 Yotqizilgan</option>
+                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>🟢 Yakunlangan</option>
+                    </select>
+                </div>
+
+                <!-- Jins -->
+                <div class="col-md-1">
+                    <label class="form-label small">Jins</label>
+                    <select name="gender" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="M" {% if selected_gender == 'M' %}selected{% endif %}>Erkak</option>
+                        <option value="F" {% if selected_gender == 'F' %}selected{% endif %}>Ayol</option>
+                    </select>
+                </div>
+
+                <!-- Kategoriya -->
+                <div class="col-md-2">
+                    <label class="form-label small">Kategoriya</label>
+                    <select name="patient_category" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="railway" {% if selected_category == 'railway' %}selected{% endif %}>Temir yo'lchi</option>
+                        <option value="paid" {% if selected_category == 'paid' %}selected{% endif %}>Pullik</option>
+                        <option value="non_resident" {% if selected_category == 'non_resident' %}selected{% endif %}>Norezident</option>
+                        <option value="foreign" {% if selected_category == 'foreign' %}selected{% endif %}>Chet el</option>
+                    </select>
+                </div>
+
+                <!-- Rezidentlik -->
+                <div class="col-md-2">
+                    <label class="form-label small">Rezidentlik</label>
+                    <select name="resident_status" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="resident" {% if selected_resident == 'resident' %}selected{% endif %}>Rezident</option>
+                        <option value="non_resident" {% if selected_resident == 'non_resident' %}selected{% endif %}>Norezident</option>
+                    </select>
+                </div>
+
+                <!-- Qabul turi -->
+                <div class="col-md-2">
+                    <label class="form-label small">Qabul turi</label>
+                    <select name="referral_type" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="self" {% if selected_referral == 'self' %}selected{% endif %}>O'zi kelgan</option>
+                        <option value="ambulance" {% if selected_referral == 'ambulance' %}selected{% endif %}>Tez yordam</option>
+                        <option value="referral" {% if selected_referral == 'referral' %}selected{% endif %}>Yo'llanma</option>
+                        <option value="liniya" {% if selected_referral == 'liniya' %}selected{% endif %}>Liniya</option>
+                    </select>
+                </div>
+
+                <!-- Tugmalar -->
+                <div class="col-md-12 d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        🔍 Filtrlash
+                    </button>
+                    <a href="{% url 'statistics_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                        ✕ Tozalash
+                    </a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================== KARTOCHKALAR ==================== -->
+<div class="row g-2 mb-4">
     <div class="col-md-2">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <h2 class="text-primary">{{ total }}</h2>
-                <p class="mb-0 small">Jami bemorlar</p>
+        <div class="card border-primary text-center">
+            <div class="card-body py-2">
+                <h3 class="text-primary mb-0">{{ total }}</h3>
+                <small>Jami bemorlar</small>
             </div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <h2 class="text-success">{{ discharged }}</h2>
-                <p class="mb-0 small">Chiqarildi</p>
+        <div class="card border-success text-center">
+            <div class="card-body py-2">
+                <h3 class="text-success mb-0">{{ discharged }}</h3>
+                <small>Chiqarildi</small>
             </div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card border-danger">
-            <div class="card-body text-center">
-                <h2 class="text-danger">{{ deceased }}</h2>
-                <p class="mb-0 small">Vafot etdi</p>
+        <div class="card border-danger text-center">
+            <div class="card-body py-2">
+                <h3 class="text-danger mb-0">{{ deceased }}</h3>
+                <small>Vafot etdi</small>
             </div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card border-warning">
-            <div class="card-body text-center">
-                <h2 class="text-warning">{{ transferred }}</h2>
-                <p class="mb-0 small">O'tkazildi</p>
+        <div class="card border-warning text-center">
+            <div class="card-body py-2">
+                <h3 class="text-warning mb-0">{{ transferred }}</h3>
+                <small>O'tkazildi</small>
             </div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <h2 class="text-info">{{ avg_days }}</h2>
-                <p class="mb-0 small">O'rtacha yotish (kun)</p>
+        <div class="card border-info text-center">
+            <div class="card-body py-2">
+                <h3 class="text-info mb-0">{{ avg_days }}</h3>
+                <small>O'rtacha kun</small>
             </div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card border-secondary">
-            <div class="card-body text-center">
-                <h2 class="text-secondary">{{ non_resident_count }}</h2>
-                <p class="mb-0 small">Norezidentlar</p>
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <h3 class="text-secondary mb-0">{{ non_resident_count }}</h3>
+                <small>Norezident</small>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Grafiklar -->
+<!-- Status kartochkalari -->
+<div class="row g-2 mb-4">
+    <div class="col-md-4">
+        <div class="card text-center" style="border-color: #ffc107;">
+            <div class="card-body py-2">
+                <h4 class="mb-0">🟡 {{ registered }}</h4>
+                <small>Registratsiya qilingan</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center" style="border-color: #0d6efd;">
+            <div class="card-body py-2">
+                <h4 class="mb-0">🔵 {{ admitted }}</h4>
+                <small>Yotqizilgan</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center" style="border-color: #198754;">
+            <div class="card-body py-2">
+                <h4 class="mb-0">🟢 {{ completed }}</h4>
+                <small>Yakunlangan</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== GRAFIKLAR ==================== -->
 <div class="row g-3 mb-4">
-    <!-- Oylik dinamika -->
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header">Oylik qabul dinamikasi</div>
+            <div class="card-header">Oylik dinamika</div>
             <div class="card-body">
                 <canvas id="monthlyChart" height="100"></canvas>
             </div>
         </div>
     </div>
-
-    <!-- Jins -->
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Jins bo'yicha</div>
@@ -109,19 +269,15 @@
             </div>
         </div>
     </div>
-
-    <!-- Bo'lim -->
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
-            <div class="card-header">Bo'limlar bo'yicha</div>
+            <div class="card-header">Kategoriya bo'yicha</div>
             <div class="card-body">
-                <canvas id="deptChart" height="120"></canvas>
+                <canvas id="categoryChart"></canvas>
             </div>
         </div>
     </div>
-
-    <!-- Yakun -->
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header">Kasallanish yakuni</div>
             <div class="card-body">
@@ -129,9 +285,7 @@
             </div>
         </div>
     </div>
-
-    <!-- Shoshilinch -->
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header">Qabul turi</div>
             <div class="card-body">
@@ -142,47 +296,67 @@
 </div>
 
 <!-- Bo'lim jadvali -->
-<div class="card mb-4">
-    <div class="card-header">Bo'limlar bo'yicha tafsilot</div>
+<div class="card mb-3">
+    <div class="card-header">Bo'limlar bo'yicha</div>
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead class="table-light">
-                <tr>
-                    <th>Bo'lim</th>
-                    <th>Bemorlar soni</th>
-                    <th>Ulushi</th>
-                </tr>
+                <tr><th>Bo'lim</th><th>Bemorlar</th><th>Ulushi</th></tr>
             </thead>
             <tbody>
                 {% for item in dept_stats %}
                 <tr>
-                    <td>{{ item.department__name|default:"Noma'lum" }}</td>
+                    <td>{{ item.department__name }}</td>
                     <td>{{ item.count }}</td>
                     <td>
-                        <div class="progress" style="height: 20px;">
+                        <div class="progress" style="height:18px;">
                             <div class="progress-bar"
-                                 style="width: {% if total %}{% widthratio item.count total 100 %}%{% else %}0%{% endif %}">
+                                 style="width:{% if total %}{% widthratio item.count total 100 %}%{% else %}0%{% endif %}">
                                 {% if total %}{% widthratio item.count total 100 %}%{% endif %}
                             </div>
                         </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="3" class="text-center text-muted">Ma'lumot yo'q</td>
-                </tr>
+                <tr><td colspan="3" class="text-center text-muted">Ma'lumot yo'q</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
+<!-- Shifokor jadvali -->
+{% if doctor_stats %}
+<div class="card mb-4">
+    <div class="card-header">Shifokorlar bo'yicha (Top 10)</div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr><th>Shifokor</th><th>Bemorlar</th></tr>
+            </thead>
+            <tbody>
+                {% for item in doctor_stats %}
+                <tr>
+                    <td>{{ item.attending_doctor__full_name }}</td>
+                    <td>{{ item.count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Export tugmalari -->
 <div class="d-flex gap-2 mb-5">
-    <a href="{% url 'export_excel' %}?year={{ selected_year }}&department={{ selected_dept }}"
-       class="btn btn-success">📥 Excel yuklab olish</a>
-    <a href="{% url 'export_pdf' %}?year={{ selected_year }}&department={{ selected_dept }}"
-       class="btn btn-danger">📄 PDF yuklab olish</a>
+    <a href="{% url 'export_excel' %}?{{ current_filters }}"
+       class="btn btn-success">
+        📥 Excel yuklab olish
+    </a>
+    <a href="{% url 'export_pdf' %}?{{ current_filters }}"
+       class="btn btn-danger">
+        📄 PDF yuklab olish
+    </a>
 </div>
 
 {% endblock %}
@@ -191,21 +365,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const genderData = {{ gender_data|safe }};
+const categoryData = {{ category_data|safe }};
 const monthlyLabels = {{ monthly_labels|safe }};
 const monthlyValues = {{ monthly_values|safe }};
 
-// Oylik grafik
+// Oylik
 new Chart(document.getElementById('monthlyChart'), {
     type: 'line',
     data: {
         labels: monthlyLabels,
         datasets: [{
-            label: 'Bemorlar soni',
+            label: 'Bemorlar',
             data: monthlyValues,
             borderColor: '#0d6efd',
             backgroundColor: 'rgba(13,110,253,0.1)',
-            tension: 0.3,
-            fill: true,
+            tension: 0.3, fill: true
         }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }
@@ -216,10 +390,21 @@ new Chart(document.getElementById('genderChart'), {
     type: 'doughnut',
     data: {
         labels: ['Erkak', 'Ayol'],
-        datasets: [{
-            data: [genderData.M, genderData.F],
-            backgroundColor: ['#0d6efd', '#e83e8c']
-        }]
+        datasets: [{ data: [genderData.M, genderData.F],
+                    backgroundColor: ['#0d6efd', '#e83e8c'] }]
+    },
+    options: { responsive: true }
+});
+
+// Kategoriya
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ["Temir yo'lchi", 'Pullik', 'Norezident', 'Chet el'],
+        datasets: [{ data: [
+            categoryData.railway, categoryData.paid,
+            categoryData.non_resident, categoryData.foreign
+        ], backgroundColor: ['#0d6efd', '#ffc107', '#dc3545', '#198754'] }]
     },
     options: { responsive: true }
 });
@@ -229,10 +414,8 @@ new Chart(document.getElementById('outcomeChart'), {
     type: 'doughnut',
     data: {
         labels: ['Chiqarildi', 'Vafot', "O'tkazildi"],
-        datasets: [{
-            data: [{{ discharged }}, {{ deceased }}, {{ transferred }}],
-            backgroundColor: ['#198754', '#dc3545', '#ffc107']
-        }]
+        datasets: [{ data: [{{ discharged }}, {{ deceased }}, {{ transferred }}],
+                    backgroundColor: ['#198754', '#dc3545', '#ffc107'] }]
     },
     options: { responsive: true }
 });
@@ -242,36 +425,10 @@ new Chart(document.getElementById('emergencyChart'), {
     type: 'doughnut',
     data: {
         labels: ['Shoshilinch', 'Oddiy'],
-        datasets: [{
-            data: [{{ emergency_count }}, {{ non_emergency_count }}],
-            backgroundColor: ['#dc3545', '#6c757d']
-        }]
+        datasets: [{ data: [{{ emergency_count }}, {{ non_emergency_count }}],
+                    backgroundColor: ['#dc3545', '#6c757d'] }]
     },
     options: { responsive: true }
-});
-
-// Bo'limlar — dept_stats ni JSON ga o'girish
-const deptStats = [
-    {% for item in dept_stats %}
-        {"name": "{{ item.department__name|default:'Nomalum' }}", "count": {{ item.count }}}{% if not forloop.last %},{% endif %}
-    {% endfor %}
-];
-
-new Chart(document.getElementById('deptChart'), {
-    type: 'bar',
-    data: {
-        labels: deptStats.map(d => d.name),
-        datasets: [{
-            label: 'Bemorlar',
-            data: deptStats.map(d => d.count),
-            backgroundColor: '#0d6efd'
-        }]
-    },
-    options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: { legend: { display: false } }
-    }
 });
 </script>
 {% endblock %}
