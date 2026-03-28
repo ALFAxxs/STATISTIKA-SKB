@@ -5,6 +5,24 @@
 {% block content %}
 <style>
     select[name$="operation_type"] { display: none !important; }
+
+    /* ===== TOGGLE BUTTONS ===== */
+    .toggle-group { display: flex; gap: 8px; }
+    .toggle-btn {
+        padding: 6px 20px;
+        border-radius: 20px;
+        border: 2px solid #dee2e6;
+        background: #f8f9fa;
+        color: #6c757d;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .toggle-btn:hover { border-color: #adb5bd; background: #e9ecef; }
+    .toggle-btn.active-yes { border-color: #198754; background: #198754; color: #fff; }
+    .toggle-btn.active-no  { border-color: #dc3545; background: #dc3545; color: #fff; }
 </style>
 
 <div class="row">
@@ -54,20 +72,16 @@
                         <div class="text-danger small">{{ form.full_name.errors }}</div>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <label class="form-label fw-bold">Rezidentlik holati</label>
-                        <div class="d-flex gap-3 mt-2">
-                            {% for choice in form.resident_status %}
-                                <div class="form-check">
-                                    {{ choice.tag }}
-                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
-                                        {{ choice.choice_label }}
-                                    </label>
-                                </div>
-                            {% endfor %}
+                        <label class="form-label fw-bold d-block">Rezidentlik holati</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="res-yes">🏠 Rezident</button>
+                            <button type="button" class="toggle-btn" id="res-no">🌍 Norezident</button>
                         </div>
+                        <input type="hidden" name="resident_status" id="resident_status_val"
+                               value="{{ form.instance.resident_status|default:'resident' }}">
                         <div class="text-danger small">{{ form.resident_status.errors }}</div>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-3" id="patient-category-field">
                         <label class="form-label">{{ form.patient_category.label }}</label>
                         {{ form.patient_category }}
                         <div class="text-danger small">{{ form.patient_category.errors }}</div>
@@ -108,6 +122,29 @@
                         <label class="form-label">{{ form.position.label }}</label>
                         {{ form.position }}
                     </div>
+
+                    <!-- Urush qatnashchisi — TOGGLE -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold d-block">Urush qatnashchisi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="vet-yes">&#9876; Ha</button>
+                            <button type="button" class="toggle-btn" id="vet-no">&#10007; Yo'q</button>
+                        </div>
+                        <input type="hidden" name="is_war_veteran" id="is_war_veteran_val"
+                               value="{{ form.instance.is_war_veteran|yesno:'True,False' }}">
+                    </div>
+
+                    <!-- Pensioner — TOGGLE -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold d-block">Pensioner?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="pen-yes">&#128081; Ha</button>
+                            <button type="button" class="toggle-btn" id="pen-no">&#10007; Yo'q</button>
+                        </div>
+                        <input type="hidden" name="is_pensioner" id="is_pensioner_val"
+                               value="{{ form.instance.is_pensioner|yesno:'True,False'|default:'False' }}">
+                    </div>
+
                 </div>
             </div>
 
@@ -197,7 +234,7 @@
                         {{ form.department }}
                         <div class="text-danger small">{{ form.department.errors }}</div>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-3 mb-3" id="hospital-type-field">
                         <label class="form-label">{{ form.hospital_type.label }}</label>
                         {{ form.hospital_type }}
                     </div>
@@ -206,31 +243,23 @@
                         {{ form.admission_count }}
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">Shoshilinch olib kelinganmi?</label>
-                        <div class="d-flex gap-3 mt-2">
-                            {% for choice in form.is_emergency %}
-                                <div class="form-check">
-                                    {{ choice.tag }}
-                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
-                                        {{ choice.choice_label }}
-                                    </label>
-                                </div>
-                            {% endfor %}
+                        <label class="form-label fw-bold d-block">Shoshilinch olib kelinganmi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="emg-yes">&#10003; Ha</button>
+                            <button type="button" class="toggle-btn" id="emg-no">&#10007; Yo'q</button>
                         </div>
+                        <input type="hidden" name="is_emergency" id="is_emergency_val"
+                               value="{{ form.instance.is_emergency|yesno:'True,False' }}">
                         <div class="text-danger small">{{ form.is_emergency.errors }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">Pullik yotqizilganmi?</label>
-                        <div class="d-flex gap-3 mt-2">
-                            {% for choice in form.is_paid %}
-                                <div class="form-check">
-                                    {{ choice.tag }}
-                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
-                                        {{ choice.choice_label }}
-                                    </label>
-                                </div>
-                            {% endfor %}
+                        <label class="form-label fw-bold d-block">Pullik yotqizilganmi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="paid-yes">&#10003; Ha</button>
+                            <button type="button" class="toggle-btn" id="paid-no">&#10007; Yo'q</button>
                         </div>
+                        <input type="hidden" name="is_paid" id="is_paid_val"
+                               value="{{ form.instance.is_paid|yesno:'True,False' }}">
                         <div class="text-danger small">{{ form.is_paid.errors }}</div>
                     </div>
                 </div>
@@ -415,29 +444,26 @@
                         <label class="form-label">WP natijasi</label>
                         {{ form.wp_test_result }}
                     </div>
-                    <div class="col-md-12 mt-2">
-                        <div class="form-check">
-                            {{ form.is_war_veteran }}
-                            <label class="form-check-label">{{ form.is_war_veteran.label }}</label>
-                        </div>
-                    </div>
+                    <!-- is_war_veteran Bemor ma'lumotlari bo'limiga ko'chirildi -->
                 </div>
             </div>
 
             <!-- 9. Shifokorlar -->
-            <div class="form-section">
-                <h5>👨‍⚕️ Shifokorlar</h5>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">{{ form.attending_doctor.label }}</label>
-                        {{ form.attending_doctor }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">{{ form.department_head.label }}</label>
-                        {{ form.department_head }}
-                    </div>
-                </div>
-            </div>
+            <!-- 9. Shifokorlar bo'limida -->
+<div class="col-md-6 mb-3">
+    <label class="form-label fw-bold">
+        {{ form.attending_doctor.label }} <span class="text-danger">*</span>
+    </label>
+    {{ form.attending_doctor }}
+    <div class="text-danger small">{{ form.attending_doctor.errors }}</div>
+</div>
+<div class="col-md-6 mb-3">
+    <label class="form-label fw-bold">
+        {{ form.department_head.label }} <span class="text-danger">*</span>
+    </label>
+    {{ form.department_head }}
+    <div class="text-danger small">{{ form.department_head.errors }}</div>
+</div>
 
             <div class="d-flex gap-2 mb-5">
                 <button type="submit" class="btn btn-primary btn-lg">💾 Saqlash</button>
@@ -455,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Bootstrap stillarini qo'llash
     document.querySelectorAll('input, select, textarea').forEach(el => {
-        if (!el.classList.contains('form-check-input')) {
+        if (!el.classList.contains('form-check-input') && el.type !== 'hidden') {
             el.classList.add('form-control');
         }
     });
@@ -464,19 +490,67 @@ document.addEventListener('DOMContentLoaded', function() {
         el.classList.add('form-select');
     });
 
-    // ==================== REZIDENT/NOREZIDENT ====================
-    const residentRadios = document.querySelectorAll('input[name="resident_status"]');
+    // ==================== TOGGLE FUNKSIYASI ====================
+    function initToggle(yesBtnId, noBtnId, hiddenId) {
+        const yesBtn = document.getElementById(yesBtnId);
+        const noBtn  = document.getElementById(noBtnId);
+        const input  = document.getElementById(hiddenId);
+        if (!yesBtn || !noBtn || !input) return;
 
-    function toggleResidentFields() {
-        const selected = document.querySelector('input[name="resident_status"]:checked');
-        const isNonResident = selected && selected.value === 'non_resident';
-        const passportCol = document.getElementById('passport-field');
-        const addressSection = document.getElementById('address-section');
-        if (passportCol) passportCol.style.display = isNonResident ? 'none' : 'block';
-        if (addressSection) addressSection.style.display = isNonResident ? 'none' : 'block';
+        function update(val) {
+            input.value = val;
+            if (val === 'True') {
+                yesBtn.classList.add('active-yes');
+                noBtn.classList.remove('active-no');
+            } else {
+                noBtn.classList.add('active-no');
+                yesBtn.classList.remove('active-yes');
+            }
+        }
+        update(input.value === 'True' ? 'True' : 'False');
+        yesBtn.addEventListener('click', () => update('True'));
+        noBtn.addEventListener('click',  () => update('False'));
     }
-    residentRadios.forEach(r => r.addEventListener('change', toggleResidentFields));
-    toggleResidentFields();
+
+    initToggle('emg-yes',  'emg-no',  'is_emergency_val');
+    initToggle('paid-yes', 'paid-no', 'is_paid_val');
+    initToggle('vet-yes',  'vet-no',  'is_war_veteran_val');
+    initToggle('pen-yes',  'pen-no',  'is_pensioner_val');
+
+    // ==================== REZIDENT TOGGLE ====================
+    (function() {
+        const resYes = document.getElementById('res-yes');
+        const resNo  = document.getElementById('res-no');
+        const input  = document.getElementById('resident_status_val');
+        if (!resYes || !resNo || !input) return;
+
+        function updateRes(val) {
+            input.value = val;
+            if (val === 'resident') {
+                resYes.classList.add('active-yes');
+                resNo.classList.remove('active-no');
+            } else {
+                resNo.classList.add('active-no');
+                resYes.classList.remove('active-yes');
+            }
+            const passportField    = document.getElementById('passport-field');
+            const addressSection   = document.getElementById('address-section');
+            const categoryField    = document.getElementById('patient-category-field');
+            const hospitalField    = document.getElementById('hospital-type-field');
+            const isNR = val === 'non_resident';
+            if (passportField)  passportField.style.display  = isNR ? 'none' : 'block';
+            if (addressSection) addressSection.style.display = isNR ? 'none' : 'block';
+            if (categoryField)  categoryField.style.display  = isNR ? 'none' : 'block';
+            if (hospitalField)  hospitalField.style.display  = isNR ? 'none' : 'block';
+        }
+
+        const current = input.value || 'resident';
+        updateRes(current);
+        resYes.addEventListener('click', () => updateRes('resident'));
+        resNo.addEventListener('click',  () => updateRes('non_resident'));
+    })();
+
+    // Rezident toggle — yuqoridagi initToggle blokida boshqariladi
 
     // ==================== IJTIMOIY HOLAT ====================
     const socialStatus = document.getElementById('id_social_status');

@@ -66,6 +66,22 @@ class PatientCardForm(forms.ModelForm):
         required=False
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Majburiy maydonlar
+        self.fields['attending_doctor'].required = True
+        self.fields['department_head'].required = True
+
+        # Qolganlar...
+        if 'status' in self.fields:
+            self.fields['status'].required = False
+            self.fields['status'].widget = forms.HiddenInput()
+        if 'registered_by' in self.fields:
+            self.fields['registered_by'].required = False
+            self.fields['registered_by'].widget = forms.HiddenInput()
+        if 'patient_category' in self.fields:
+            self.fields['patient_category'].required = False
     class Meta:
         model = PatientCard
         fields = '__all__'
@@ -248,6 +264,8 @@ class ReceptionForm(forms.ModelForm):
             'street_address', 'workplace', 'position', 'hospital_type',
             'referral_type', 'referral_organization', 'hours_after_illness',
             'is_emergency', 'is_paid',
+            'attending_doctor',
+            'department_head',
         ]
         widgets = {
             'admission_date': forms.DateTimeInput(
@@ -286,6 +304,20 @@ class ReceptionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        from .models import Doctor, Department, HospitalType
+
+        self.fields['hospital_type'].queryset = HospitalType.objects.filter(is_active=True)
+        self.fields['hospital_type'].empty_label = "— Tanlang —"
+        self.fields['department'].queryset = Department.objects.filter(is_active=True)
+        self.fields['department'].empty_label = "— Tanlang —"
+
+        # Shifokorlar — majburiy emas
+        self.fields['attending_doctor'].required = False
+        self.fields['attending_doctor'].empty_label = "— Tanlang —"
+        self.fields['department_head'].required = False
+        self.fields['department_head'].empty_label = "— Tanlang —"
+
         required_fields = [
             'admission_date', 'full_name', 'birth_date',
             'gender', 'admission_diagnosis', 'department',

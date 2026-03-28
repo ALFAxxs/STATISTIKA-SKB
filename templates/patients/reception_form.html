@@ -3,25 +3,43 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <h3>🏥 {{ title }}</h3>
+<style>
+    .toggle-group { display: flex; gap: 8px; }
+    .toggle-btn {
+        padding: 6px 20px;
+        border-radius: 20px;
+        border: 2px solid #dee2e6;
+        background: #f8f9fa;
+        color: #6c757d;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .toggle-btn:hover { border-color: #adb5bd; background: #e9ecef; }
+    .toggle-btn.active-yes { border-color: #198754; background: #198754; color: #fff; }
+    .toggle-btn.active-no  { border-color: #dc3545; background: #dc3545; color: #fff; }
+</style>
 
+<div class="row">
+    <div class="col-12">
+        <h3>{{ title }}</h3>
         <form method="post">
             {% csrf_token %}
 
             {% if form.errors %}
             <div class="alert alert-danger">
-                <strong>Xatoliklar:</strong><br>
+                <strong>Xatoliklar bor:</strong><br>
                 {% for field, errors in form.errors.items %}
                     <div>• <b>{{ field }}</b>: {{ errors|join:", " }}</div>
                 {% endfor %}
             </div>
             {% endif %}
 
-            <!-- 1. Asosiy ma'lumotlar -->
+            <!-- 1. Bemor ma'lumotlari -->
             <div class="form-section">
-                <h5>👤 Bemor ma'lumotlari <span class="text-danger">*</span></h5>
+                <h5>👤 Bemor ma'lumotlari</h5>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-bold">
@@ -37,13 +55,29 @@
                         {{ form.full_name }}
                         <div class="text-danger small">{{ form.full_name.errors }}</div>
                     </div>
+
+                    <!-- Rezidentlik — TOGGLE -->
                     <div class="col-md-3 mb-3">
-                        <label class="form-label fw-bold">
-                            Tug'ilgan sana <span class="text-danger">*</span>
-                        </label>
-                        {{ form.birth_date }}
-                        <div class="text-danger small">{{ form.birth_date.errors }}</div>
+                        <label class="form-label fw-bold d-block">Rezidentlik holati</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="res-yes">🏠 Rezident</button>
+                            <button type="button" class="toggle-btn" id="res-no">🌍 Norezident</button>
+                        </div>
+                        <input type="hidden" name="resident_status" id="resident_status_val"
+                               value="{{ form.instance.resident_status|default:'resident' }}">
+                        <div class="text-danger small">{{ form.resident_status.errors }}</div>
                     </div>
+
+                    <!-- Kategoriya -->
+                    <div class="col-md-3 mb-3" id="patient-category-field">
+                        <label class="form-label fw-bold">
+                            Bemor kategoriyasi <span class="text-danger">*</span>
+                        </label>
+                        {{ form.patient_category }}
+                        <div class="text-danger small">{{ form.patient_category.errors }}</div>
+                    </div>
+
+                    <!-- Jins -->
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">
                             Jinsi <span class="text-danger">*</span>
@@ -51,80 +85,149 @@
                         {{ form.gender }}
                         <div class="text-danger small">{{ form.gender.errors }}</div>
                     </div>
+
+                    <!-- Tug'ilgan sana -->
                     <div class="col-md-3 mb-3">
-                        <label class="form-label">Passport seriyasi</label>
-                        {{ form.passport_serial }}
+                        <label class="form-label fw-bold">
+                            Tug'ilgan sana <span class="text-danger">*</span>
+                        </label>
+                        {{ form.birth_date }}
+                        <div class="text-danger small">{{ form.birth_date.errors }}</div>
                     </div>
+
+                    <!-- Passport -->
+                    <div class="col-md-3 mb-3" id="passport-field">
+                        <label class="form-label">{{ form.passport_serial.label }}</label>
+                        {{ form.passport_serial }}
+                        <div class="text-danger small">{{ form.passport_serial.errors }}</div>
+                    </div>
+
+                    <!-- JSHSHIR -->
                     <div class="col-md-3 mb-3">
-                        <label class="form-label">JSHSHIR</label>
+                        <label class="form-label">{{ form.JSHSHIR.label }}</label>
                         {{ form.JSHSHIR }}
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">Telefon raqami</label>
+
+                    <!-- Telefon -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.phone.label }}</label>
                         {{ form.phone }}
                     </div>
-                </div>
-            </div>
 
-            <!-- 2. Ijtimoiy holat -->
-            <div class="form-section">
-                <h5>💼 Ijtimoiy holat <span class="text-danger">*</span></h5>
-                <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <!-- Ijtimoiy holat -->
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">
                             Ijtimoiy holati <span class="text-danger">*</span>
                         </label>
                         {{ form.social_status }}
                         <div class="text-danger small">{{ form.social_status.errors }}</div>
                     </div>
-                    <div class="col-md-4 mb-3" id="workplace-field">
-                        <label class="form-label">Ish joyi / O'quv joyi</label>
+
+                    <!-- Ish joyi -->
+                    <div class="col-md-3 mb-3" id="workplace-field">
+                        <label class="form-label">{{ form.workplace.label }}</label>
                         {{ form.workplace }}
                     </div>
-                    <div class="col-md-4 mb-3" id="position-field">
-                        <label class="form-label">Lavozimi</label>
+
+                    <!-- Lavozim -->
+                    <div class="col-md-3 mb-3" id="position-field">
+                        <label class="form-label">{{ form.position.label }}</label>
                         {{ form.position }}
                     </div>
+
+                    <!-- Urush qatnashchisi — TOGGLE -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold d-block">Urush qatnashchisi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="vet-yes">&#9876; Ha</button>
+                            <button type="button" class="toggle-btn" id="vet-no">&#10007; Yo'q</button>
+                        </div>
+                        <input type="hidden" name="is_war_veteran" id="is_war_veteran_val"
+                               value="{{ form.instance.is_war_veteran|yesno:'True,False' }}">
+                    </div>
+
+                    <!-- Pensioner — TOGGLE -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold d-block">Pensioner?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="pen-yes">&#128081; Ha</button>
+                            <button type="button" class="toggle-btn" id="pen-no">&#10007; Yo'q</button>
+                        </div>
+                        <input type="hidden" name="is_pensioner" id="is_pensioner_val"
+                               value="{{ form.instance.is_pensioner|yesno:'True,False'|default:'False' }}">
+                    </div>
+
                 </div>
             </div>
 
-            <!-- 3. Yashash manzili -->
-            <div class="form-section">
-                <h5>📍 Yashash manzili <span class="text-muted small">(ixtiyoriy)</span></h5>
+            <!-- 2. Yashash manzili -->
+            <div class="form-section" id="address-section">
+                <h5>📍 Yashash manzili</h5>
                 <div class="row">
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Davlat</label>
                         {{ form.country }}
+                        <div class="text-danger small">{{ form.country.errors }}</div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Viloyat</label>
                         <select name="region" id="id_region" class="form-select">
                             <option value="">— Tanlang —</option>
+                            {% if form.instance.region %}
+                                <option value="{{ form.instance.region.id }}" selected>
+                                    {{ form.instance.region.name }}
+                                </option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Tuman</label>
                         <select name="district" id="id_district" class="form-select">
                             <option value="">— Tanlang —</option>
+                            {% if form.instance.district %}
+                                <option value="{{ form.instance.district.id }}" selected>
+                                    {{ form.instance.district.name }}
+                                </option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Shahar/Qishloq</label>
                         <select name="city" id="id_city" class="form-select">
                             <option value="">— Tanlang —</option>
+                            {% if form.instance.city %}
+                                <option value="{{ form.instance.city.id }}" selected>
+                                    {{ form.instance.city.name }}
+                                </option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="col-md-12 mb-3">
-                        <label class="form-label">Ko'cha va uy raqami</label>
+                        <label class="form-label">Ko'cha nomi va uy raqami</label>
                         {{ form.street_address }}
+                        <div class="text-danger small">{{ form.street_address.errors }}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. Qabul ma'lumotlari -->
+            <!-- 3. Qabul ma'lumotlari -->
             <div class="form-section">
                 <h5>🏥 Qabul ma'lumotlari</h5>
                 <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">{{ form.referral_type.label }}</label>
+                        {{ form.referral_type }}
+                        <div class="text-danger small">{{ form.referral_type.errors }}</div>
+                    </div>
+                    <div class="col-md-8 mb-3" id="org-field">
+                        <label class="form-label">{{ form.referral_organization.label }}</label>
+                        {{ form.referral_organization }}
+                        <div class="text-danger small">{{ form.referral_organization.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">{{ form.referring_diagnosis.label }}</label>
+                        {{ form.referring_diagnosis }}
+                    </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">
                             Qabulxona tashxisi <span class="text-danger">*</span>
@@ -132,60 +235,92 @@
                         {{ form.admission_diagnosis }}
                         <div class="text-danger small">{{ form.admission_diagnosis.errors }}</div>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.hours_after_illness.label }}</label>
+                        {{ form.hours_after_illness }}
+                    </div>
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">
                             Yotqizilgan bo'lim <span class="text-danger">*</span>
                         </label>
                         {{ form.department }}
                         <div class="text-danger small">{{ form.department.errors }}</div>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold">
-                            Bemor kategoriyasi <span class="text-danger">*</span>
-                        </label>
-                        {{ form.patient_category }}
-                        <div class="text-danger small">{{ form.patient_category.errors }}</div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">Shifoxona turi</label>
+                    <div class="col-md-3 mb-3" id="hospital-type-field">
+                        <label class="form-label">{{ form.hospital_type.label }}</label>
                         {{ form.hospital_type }}
                     </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.admission_count.label }}</label>
+                        {{ form.admission_count }}
+                    </div>
+
+                    <!-- Shoshilinch — TOGGLE -->
                     <div class="col-md-4 mb-3">
-                        <label class="form-label">Kim tomonidan keltirilgan</label>
-                        {{ form.referral_type }}
-                    </div>
-                    <div class="col-md-6 mb-3" id="referral-org-field">
-                        <label class="form-label">Yo'llagan muassasa</label>
-                        {{ form.referral_organization }}
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Kasallanishdan keyin</label>
-                        {{ form.hours_after_illness }}
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label fw-bold">Shoshilinch?</label>
-                        <div class="d-flex gap-3 mt-1">
-                            {% for choice in form.is_emergency %}
-                            <div class="form-check">
-                                {{ choice.tag }}
-                                <label class="form-check-label" for="{{ choice.id_for_label }}">
-                                    {{ choice.choice_label }}
-                                </label>
-                            </div>
-                            {% endfor %}
+                        <label class="form-label fw-bold d-block">Shoshilinch olib kelinganmi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="emg-yes">&#10003; Ha</button>
+                            <button type="button" class="toggle-btn" id="emg-no">&#10007; Yo'q</button>
                         </div>
+                        <input type="hidden" name="is_emergency" id="is_emergency_val"
+                               value="{{ form.instance.is_emergency|yesno:'True,False' }}">
+                        <div class="text-danger small">{{ form.is_emergency.errors }}</div>
+                    </div>
+
+                    <!-- Pullik — TOGGLE -->
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold d-block">Pullik yotqizilganmi?</label>
+                        <div class="toggle-group mt-2">
+                            <button type="button" class="toggle-btn" id="paid-yes">&#10003; Ha</button>
+                            <button type="button" class="toggle-btn" id="paid-no">&#10007; Yo'q</button>
+                        </div>
+                        <input type="hidden" name="is_paid" id="is_paid_val"
+                               value="{{ form.instance.is_paid|yesno:'True,False' }}">
+                        <div class="text-danger small">{{ form.is_paid.errors }}</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 4. Shifokorlar -->
+            <div class="form-section">
+                <h5>👨‍⚕️ Shifokorlar <span class="text-muted fw-normal small">(ixtiyoriy)</span></h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">{{ form.attending_doctor.label }}</label>
+                        <select name="attending_doctor" id="id_attending_doctor" class="form-select">
+                            <option value="">— Tanlang —</option>
+                            {% for doc in form.attending_doctor.field.queryset %}
+                                <option value="{{ doc.pk }}"
+                                    {% if form.instance.attending_doctor_id == doc.pk %}selected{% endif %}>
+                                    {{ doc.full_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="text-danger small">{{ form.attending_doctor.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">{{ form.department_head.label }}</label>
+                        <select name="department_head" id="id_department_head" class="form-select">
+                            <option value="">— Tanlang —</option>
+                            {% for doc in form.department_head.field.queryset %}
+                                <option value="{{ doc.pk }}"
+                                    {% if form.instance.department_head_id == doc.pk %}selected{% endif %}>
+                                    {{ doc.full_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="text-danger small">{{ form.department_head.errors }}</div>
                     </div>
                 </div>
             </div>
 
+            <!-- Tugmalar -->
             <div class="d-flex gap-2 mb-5">
-                <button type="submit" class="btn btn-primary btn-lg">
-                    ✅ Qabul qilish
-                </button>
-                <a href="{% url 'patient_list' %}" class="btn btn-secondary btn-lg">
-                    Bekor qilish
-                </a>
+                <button type="submit" class="btn btn-primary btn-lg">✅ Qabul qilish</button>
+                <a href="{% url 'patient_list' %}" class="btn btn-secondary btn-lg">Bekor qilish</a>
             </div>
+
         </form>
     </div>
 </div>
@@ -193,10 +328,11 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Bootstrap stil
+document.addEventListener('DOMContentLoaded', function () {
+
+    // Bootstrap stillarini qo'llash
     document.querySelectorAll('input, select, textarea').forEach(el => {
-        if (!el.classList.contains('form-check-input')) {
+        if (!el.classList.contains('form-check-input') && el.type !== 'hidden') {
             el.classList.add('form-control');
         }
     });
@@ -205,85 +341,187 @@ document.addEventListener('DOMContentLoaded', function() {
         el.classList.add('form-select');
     });
 
-    // Ijtimoiy holat bo'yicha ish/o'quv joyi ko'rsatish
-    const socialStatus = document.getElementById('id_social_status');
+    // ==================== TOGGLE FUNKSIYASI ====================
+    function initToggle(yesBtnId, noBtnId, hiddenId) {
+        const yesBtn = document.getElementById(yesBtnId);
+        const noBtn  = document.getElementById(noBtnId);
+        const input  = document.getElementById(hiddenId);
+        if (!yesBtn || !noBtn || !input) return;
+
+        function update(val) {
+            input.value = val;
+            if (val === 'True') {
+                yesBtn.classList.add('active-yes');
+                noBtn.classList.remove('active-no');
+            } else {
+                noBtn.classList.add('active-no');
+                yesBtn.classList.remove('active-yes');
+            }
+        }
+        update(input.value === 'True' ? 'True' : 'False');
+        yesBtn.addEventListener('click', () => update('True'));
+        noBtn.addEventListener('click',  () => update('False'));
+    }
+
+    initToggle('emg-yes',  'emg-no',  'is_emergency_val');
+    initToggle('paid-yes', 'paid-no', 'is_paid_val');
+    initToggle('vet-yes',  'vet-no',  'is_war_veteran_val');
+    initToggle('pen-yes',  'pen-no',  'is_pensioner_val');
+
+    // ==================== REZIDENT TOGGLE ====================
+    (function () {
+        const resYes = document.getElementById('res-yes');
+        const resNo  = document.getElementById('res-no');
+        const input  = document.getElementById('resident_status_val');
+        if (!resYes || !resNo || !input) return;
+
+        function updateRes(val) {
+            input.value = val;
+            if (val === 'resident') {
+                resYes.classList.add('active-yes');
+                resNo.classList.remove('active-no');
+            } else {
+                resNo.classList.add('active-no');
+                resYes.classList.remove('active-yes');
+            }
+            const passportField  = document.getElementById('passport-field');
+            const addressSection = document.getElementById('address-section');
+            const categoryField  = document.getElementById('patient-category-field');
+            const hospitalField  = document.getElementById('hospital-type-field');
+            const isNR = val === 'non_resident';
+            if (passportField)  passportField.style.display  = isNR ? 'none' : 'block';
+            if (addressSection) addressSection.style.display = isNR ? 'none' : 'block';
+            if (categoryField)  categoryField.style.display  = isNR ? 'none' : 'block';
+            if (hospitalField)  hospitalField.style.display  = isNR ? 'none' : 'block';
+        }
+
+        const current = input.value || 'resident';
+        updateRes(current);
+        resYes.addEventListener('click', () => updateRes('resident'));
+        resNo.addEventListener('click',  () => updateRes('non_resident'));
+    })();
+
+    // ==================== IJTIMOIY HOLAT ====================
+    const socialStatus   = document.getElementById('id_social_status');
     const workplaceField = document.getElementById('workplace-field');
-    const positionField = document.getElementById('position-field');
+    const positionField  = document.getElementById('position-field');
 
     function toggleWorkplace() {
+        if (!socialStatus) return;
         const val = socialStatus.value;
-        const showWorkplace = ['employed', 'student_higher', 'student_school'].includes(val);
-        const showPosition = val === 'employed';
-        workplaceField.style.display = showWorkplace ? 'block' : 'none';
-        positionField.style.display = showPosition ? 'block' : 'none';
+        const showWp  = ['employed', 'student_higher', 'student_school'].includes(val);
+        const showPos = val === 'employed';
+        if (workplaceField) workplaceField.style.display = showWp  ? 'block' : 'none';
+        if (positionField)  positionField.style.display  = showPos ? 'block' : 'none';
     }
     if (socialStatus) {
         socialStatus.addEventListener('change', toggleWorkplace);
         toggleWorkplace();
     }
 
-    // Yo'llanma turi bo'yicha muassasa ko'rsatish
+    // ==================== YO'LLANMA TURI ====================
     const referralType = document.getElementById('id_referral_type');
-    const referralOrgField = document.getElementById('referral-org-field');
+    const orgField     = document.getElementById('org-field');
 
-    function toggleReferralOrg() {
-        if (!referralType || !referralOrgField) return;
+    function toggleOrgField() {
+        if (!referralType || !orgField) return;
         const show = ['referral', 'liniya'].includes(referralType.value);
-        referralOrgField.style.display = show ? 'block' : 'none';
+        orgField.style.display = show ? 'block' : 'none';
     }
     if (referralType) {
-        referralType.addEventListener('change', toggleReferralOrg);
-        toggleReferralOrg();
+        referralType.addEventListener('change', toggleOrgField);
+        toggleOrgField();
     }
 
-    // Manzil cascade
+    // ==================== MANZIL CASCADE ====================
     const countryEl = document.getElementById('id_country');
     if (countryEl) {
-        countryEl.addEventListener('change', function() {
-            const regionSelect = document.getElementById('id_region');
-            const districtSelect = document.getElementById('id_district');
-            const citySelect = document.getElementById('id_city');
-            regionSelect.innerHTML = '<option value="">— Tanlang —</option>';
-            districtSelect.innerHTML = '<option value="">— Tanlang —</option>';
-            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+        countryEl.addEventListener('change', function () {
+            const r = document.getElementById('id_region');
+            const d = document.getElementById('id_district');
+            const c = document.getElementById('id_city');
+            r.innerHTML = '<option value="">— Tanlang —</option>';
+            d.innerHTML = '<option value="">— Tanlang —</option>';
+            c.innerHTML = '<option value="">— Tanlang —</option>';
             if (!this.value) return;
             fetch(`/patients/ajax/regions/?country_id=${this.value}`)
-                .then(r => r.json())
+                .then(res => res.json())
                 .then(data => data.forEach(item => {
-                    regionSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                    r.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 }));
         });
     }
 
     const regionEl = document.getElementById('id_region');
     if (regionEl) {
-        regionEl.addEventListener('change', function() {
-            const districtSelect = document.getElementById('id_district');
-            const citySelect = document.getElementById('id_city');
-            districtSelect.innerHTML = '<option value="">— Tanlang —</option>';
-            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+        regionEl.addEventListener('change', function () {
+            const d = document.getElementById('id_district');
+            const c = document.getElementById('id_city');
+            d.innerHTML = '<option value="">— Tanlang —</option>';
+            c.innerHTML = '<option value="">— Tanlang —</option>';
             if (!this.value) return;
             fetch(`/patients/ajax/districts/?region_id=${this.value}`)
-                .then(r => r.json())
+                .then(res => res.json())
                 .then(data => data.forEach(item => {
-                    districtSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                    d.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 }));
         });
     }
 
     const districtEl = document.getElementById('id_district');
     if (districtEl) {
-        districtEl.addEventListener('change', function() {
-            const citySelect = document.getElementById('id_city');
-            citySelect.innerHTML = '<option value="">— Tanlang —</option>';
+        districtEl.addEventListener('change', function () {
+            const c = document.getElementById('id_city');
+            c.innerHTML = '<option value="">— Tanlang —</option>';
             if (!this.value) return;
             fetch(`/patients/ajax/cities/?district_id=${this.value}`)
-                .then(r => r.json())
+                .then(res => res.json())
                 .then(data => data.forEach(item => {
-                    citySelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                    c.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 }));
         });
     }
-});
+
+    // ==================== BO'LIM → SHIFOKOR FILTER ====================
+    const deptSelect    = document.getElementById('id_department');
+    const doctorSelect  = document.getElementById('id_attending_doctor');
+    const headSelect    = document.getElementById('id_department_head');
+
+    function loadDoctors(deptId) {
+        if (!doctorSelect || !headSelect) return;
+        if (!deptId) {
+            doctorSelect.innerHTML = '<option value="">— Tanlang —</option>';
+            headSelect.innerHTML   = '<option value="">— Tanlang —</option>';
+            return;
+        }
+        fetch(`/patients/ajax/doctors/?department_id=${deptId}`)
+            .then(res => res.json())
+            .then(data => {
+                doctorSelect.innerHTML = '<option value="">— Tanlang —</option>';
+                headSelect.innerHTML   = '<option value="">— Tanlang —</option>';
+                data.forEach(doc => {
+                    const opt1 = new Option(doc.full_name, doc.id);
+                    const opt2 = new Option(doc.full_name, doc.id);
+                    doctorSelect.add(opt1);
+                    // Bo'lim mudiri faqat is_head=True bo'lganlar
+                    if (doc.is_head) headSelect.add(opt2);
+                });
+                // Agar faqat bitta mudir bo'lsa — avtomatik tanlash
+                if (headSelect.options.length === 2) {
+                    headSelect.selectedIndex = 1;
+                }
+            })
+            .catch(() => {});
+    }
+
+    if (deptSelect) {
+        deptSelect.addEventListener('change', function () {
+            loadDoctors(this.value);
+        });
+        // Sahifa yuklanganida ham ishlasin (tahrirlash rejimi)
+        if (deptSelect.value) loadDoctors(deptSelect.value);
+    }
+
+}); // DOMContentLoaded
 </script>
 {% endblock %}

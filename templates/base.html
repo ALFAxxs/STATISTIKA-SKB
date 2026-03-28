@@ -20,6 +20,34 @@
             margin-bottom: 16px;
         }
         #death-section { display: none; }
+
+        /* ===== GLOBAL TOGGLE BUTTONS ===== */
+        .toggle-group { display: flex; gap: 8px; }
+        .toggle-btn {
+            padding: 6px 20px;
+            border-radius: 20px;
+            border: 2px solid #dee2e6;
+            background: #f8f9fa;
+            color: #6c757d;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            user-select: none;
+            outline: none;
+        }
+        .toggle-btn:hover { border-color: #adb5bd; background: #e9ecef; }
+        .toggle-btn:focus { box-shadow: none; outline: none; }
+        .toggle-btn.active-yes {
+            border-color: #198754;
+            background: #198754;
+            color: #fff;
+        }
+        .toggle-btn.active-no {
+            border-color: #dc3545;
+            background: #dc3545;
+            color: #fff;
+        }
     </style>
 </head>
 <body>

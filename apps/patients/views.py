@@ -367,6 +367,20 @@ def patient_detail(request, pk):
     })
 
 
+def get_doctors(request):
+    """AJAX — bo'lim bo'yicha shifokorlarni qaytarish"""
+    department_id = request.GET.get('department_id')
+    if not department_id:
+        return JsonResponse([], safe=False)
+
+    from .models import Doctor
+    doctors = Doctor.objects.filter(
+        department_id=department_id,
+        is_active=True
+    ).values('id', 'full_name', 'is_head').order_by('-is_head', 'full_name')
+
+    return JsonResponse(list(doctors), safe=False)
+
 @login_required
 @role_required('admin', 'doctor', 'statistician')
 def patient_card_create(request):

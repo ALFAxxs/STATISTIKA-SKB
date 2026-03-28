@@ -217,6 +217,7 @@ class PatientCard(models.Model):
     SOCIAL_STATUS_CHOICES = [
         ('employed', 'Ishlaydi'),
         ('unemployed', 'Vaqtincha ishsiz'),
+        ('pensioner', 'Pensioner'),
         ('student_higher', 'Student'),
         ('student_school', "O'quvchi"),
         ('dependent', "Ota-ona qaramog'ida"),
@@ -257,6 +258,7 @@ class PatientCard(models.Model):
     # --- Qo'shimcha ---
     is_emergency = models.BooleanField(default=False)
     is_paid = models.BooleanField(default=False)
+    is_pensioner = models.BooleanField(default=False, verbose_name="Pensioner")
 
     # --- Shifoxona turi ---
     hospital_type = models.ForeignKey(

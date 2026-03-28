@@ -19,6 +19,7 @@ urlpatterns = [
     path('ajax/cities/', views.get_cities, name='get_cities'),
     path('ajax/villages/', views.get_villages, name='get_villages'),
     path('conclusion/add/', views.add_conclusion, name='add_conclusion'),
+    path('ajax/doctors/', views.get_doctors, name='get_doctors'),
 
     # --- pk li URL lar eng oxirda ---
     path('<int:pk>/', views.patient_detail, name='patient_detail'),
