@@ -99,7 +99,7 @@ def statistics_dashboard(request):
     category_stats = qs.values('patient_category').annotate(count=Count('id'))
     category_data = {
         'railway': 0, 'paid': 0,
-        'non_resident': 0, 'foreign': 0
+        'non_resident': 0,
     }
     for item in category_stats:
         if item['patient_category'] in category_data:

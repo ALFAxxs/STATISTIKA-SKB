@@ -267,17 +267,7 @@
                         <div class="text-danger small">{{ form.is_emergency.errors }}</div>
                     </div>
 
-                    <!-- Pullik — TOGGLE -->
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label fw-bold d-block">Pullik yotqizilganmi?</label>
-                        <div class="toggle-group mt-2">
-                            <button type="button" class="toggle-btn" id="paid-yes">&#10003; Ha</button>
-                            <button type="button" class="toggle-btn" id="paid-no">&#10007; Yo'q</button>
-                        </div>
-                        <input type="hidden" name="is_paid" id="is_paid_val"
-                               value="{{ form.instance.is_paid|yesno:'True,False' }}">
-                        <div class="text-danger small">{{ form.is_paid.errors }}</div>
-                    </div>
+
 
                 </div>
             </div>
@@ -364,7 +354,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     initToggle('emg-yes',  'emg-no',  'is_emergency_val');
-    initToggle('paid-yes', 'paid-no', 'is_paid_val');
     initToggle('vet-yes',  'vet-no',  'is_war_veteran_val');
     initToggle('pen-yes',  'pen-no',  'is_pensioner_val');
 

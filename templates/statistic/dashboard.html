@@ -130,7 +130,6 @@
                         <option value="railway" {% if selected_category == 'railway' %}selected{% endif %}>Temir yo'lchi</option>
                         <option value="paid" {% if selected_category == 'paid' %}selected{% endif %}>Pullik</option>
                         <option value="non_resident" {% if selected_category == 'non_resident' %}selected{% endif %}>Norezident</option>
-                        <option value="foreign" {% if selected_category == 'foreign' %}selected{% endif %}>Chet el</option>
                     </select>
                 </div>
 
@@ -400,11 +399,11 @@ new Chart(document.getElementById('genderChart'), {
 new Chart(document.getElementById('categoryChart'), {
     type: 'doughnut',
     data: {
-        labels: ["Temir yo'lchi", 'Pullik', 'Norezident', 'Chet el'],
+        labels: ["Temir yo'lchi", 'Pullik', 'Norezident'],
         datasets: [{ data: [
             categoryData.railway, categoryData.paid,
-            categoryData.non_resident, categoryData.foreign
-        ], backgroundColor: ['#0d6efd', '#ffc107', '#dc3545', '#198754'] }]
+            categoryData.non_resident
+        ], backgroundColor: ['#0d6efd', '#ffc107', '#dc3545'] }]
     },
     options: { responsive: true }
 });

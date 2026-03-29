@@ -1,0 +1,655 @@
+<!-- templates/services/patient_services.html -->
+{% extends 'base.html' %}
+{% block title %}{{ patient.full_name }} — Xizmatlar{% endblock %}
+
+{% block content %}
+<style>
+    .stat-card { border-radius: 10px; padding: 16px 20px; border: none; }
+    .badge-status-ordered     { background: #fff3cd; color: #856404; }
+    .badge-status-in_progress { background: #cfe2ff; color: #0a58ca; }
+    .badge-status-completed   { background: #d1e7dd; color: #0f5132; }
+    .badge-status-cancelled   { background: #f8d7da; color: #842029; }
+    .svc-dropdown {
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 2000;
+        background: #fff; border: 1px solid #dee2e6; border-radius: 8px;
+        max-height: 280px; overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,.15);
+        display: none;
+    }
+    .svc-item {
+        padding: 10px 14px; cursor: pointer;
+        border-bottom: 1px solid #f1f1f1; transition: background .1s;
+    }
+    .svc-item:hover { background: #e8f4fd; }
+    .svc-item:last-child { border-bottom: none; }
+    .price-pill {
+        background: #198754; color: #fff;
+        padding: 3px 10px; border-radius: 20px;
+        font-size: 13px; font-weight: 600; white-space: nowrap;
+    }
+    .cart-table th { font-size: 13px; }
+    .cart-table td { font-size: 13px; vertical-align: middle; }
+    .cart-empty { color: #adb5bd; font-style: italic; }
+    .cart-total-row { background: #f8f9fa; font-weight: 600; }
+</style>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h4 class="mb-1">🏥 Xizmatlar</h4>
+        <p class="text-muted mb-0">
+            <strong>{{ patient.full_name }}</strong>
+            <span class="badge bg-secondary ms-2">{{ patient.medical_record_number }}</span>
+            <span class="badge ms-1
+                {% if patient.patient_category == 'railway' %}bg-primary
+                {% elif patient.patient_category == 'paid' %}bg-warning text-dark
+                {% else %}bg-danger{% endif %}">
+                {{ patient.get_patient_category_display }}
+            </span>
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+            ➕ Xizmat qo'shish
+        </button>
+        <a href="{% url 'patient_detail' patient.pk %}" class="btn btn-outline-secondary">← Bemor kartasi</a>
+    </div>
+</div>
+
+<!-- Ko'rsatkichlar -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="stat-card bg-primary bg-opacity-10 text-center">
+            <div class="h4 text-primary fw-bold mb-1">{{ total_count }}</div>
+            <div class="small text-muted">Jami xizmatlar</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-dark bg-opacity-10 text-center">
+            <div class="h6 fw-bold mb-1">{{ total_price|floatformat:0 }} so'm</div>
+            <div class="small text-muted">Umumiy summa</div>
+        </div>
+    </div>
+
+</div>
+
+{% if cat_stats %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+    {% for cat in cat_stats %}
+    <span class="badge bg-light text-dark border px-3 py-2">
+        {{ cat.service__category__icon|default:"🏥" }} {{ cat.service__category__name }}:
+        <strong>{{ cat.count }} ta</strong> — {{ cat.total|floatformat:0 }} so'm
+    </span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Jadval filtri -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <button class="btn btn-sm btn-primary cat-filter" data-cat="">Barchasi</button>
+    {% for cat in categories %}
+    <button class="btn btn-sm btn-outline-primary cat-filter" data-cat="{{ cat.id }}">
+        {{ cat.icon }} {{ cat.name }}
+    </button>
+    {% endfor %}
+</div>
+
+<!-- Saqlangan xizmatlar jadvali -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0" id="services-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Xizmat</th>
+                    <th>Kategoriya</th>
+                    <th class="text-center">Miqdor</th>
+                    <th class="text-end">Narx</th>
+                    <th class="text-end">Jami</th>
+                    <th>Holat</th>
+                    <th>Sana</th>
+                    <th class="text-center">Amallar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in services %}
+                <tr data-cat="{{ item.service.category_id }}">
+                    <td>
+                        <div class="fw-semibold">{{ item.service.name }}</div>
+                        {% if item.ordered_by %}<small class="text-muted">{{ item.ordered_by.full_name }}</small>{% endif %}
+                        {% if item.result %}<div class="text-muted small mt-1">📋 {{ item.result|truncatechars:50 }}</div>{% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary bg-opacity-15 text-secondary">
+                            {{ item.service.category.icon|default:"🏥" }} {{ item.service.category.name }}
+                        </span>
+                    </td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-end">{{ item.price|floatformat:0 }} so'm</td>
+                    <td class="text-end fw-semibold">{{ item.total_price|floatformat:0 }} so'm</td>
+                    <td>
+                        <span class="badge badge-status-{{ item.status }} px-2 py-1 rounded-pill">
+                            {{ item.get_status_display }}
+                        </span>
+                    </td>
+
+                    <td><small>{{ item.ordered_at|date:"d.m.Y H:i" }}</small></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-primary btn-edit"
+                                data-id="{{ item.pk }}" data-status="{{ item.status }}"
+                                data-result="{{ item.result }}"
+                                data-bs-toggle="modal" data-bs-target="#editModal">✏️</button>
+                        {% if item.status == 'ordered' %}
+                        <button class="btn btn-sm btn-outline-danger btn-delete"
+                                data-id="{{ item.pk }}">🗑</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-5">
+                        Xizmatlar qo'shilmagan.<br>
+                        <button class="btn btn-success btn-sm mt-2"
+                                data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                            ➕ Xizmat qo'shish
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<!-- ===== XIZMAT QO'SHISH MODAL (Savatcha) ===== -->
+<div class="modal fade" id="addServiceModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">➕ Xizmatlar qo'shish</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+
+                    <!-- CHAP: Qidiruv -->
+                    <div class="col-md-6">
+                        <div class="card border h-100">
+                            <div class="card-header bg-light py-2">
+                                <strong>🔍 Xizmat tanlash</strong>
+                            </div>
+                            <div class="card-body">
+
+                                <!-- Kategoriya -->
+                                <div class="mb-2">
+                                    <div class="d-flex flex-wrap gap-1" id="modal-cat-btns">
+                                        <button type="button" class="btn btn-xs btn-primary modal-cat-btn py-1 px-2" style="font-size:12px" data-cat="">Barchasi</button>
+                                        {% for cat in categories %}
+                                        <button type="button" class="btn btn-xs btn-outline-primary modal-cat-btn py-1 px-2" style="font-size:12px" data-cat="{{ cat.id }}">
+                                            {{ cat.icon }} {{ cat.name }}
+                                        </button>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <!-- Qidiruv -->
+                                <div class="mb-2" style="position:relative;">
+                                    <input type="text" id="svc-search" class="form-control"
+                                           placeholder="🔍 Xizmat nomi yoki kodi..." autocomplete="off">
+                                    <div id="svc-dropdown" class="svc-dropdown"></div>
+                                </div>
+
+                                <!-- Miqdor va shifokor -->
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small fw-bold mb-1">Miqdori</label>
+                                        <input type="number" id="svc-qty" class="form-control form-control-sm" value="1" min="1">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small fw-bold mb-1">Narxi</label>
+                                        <div class="form-control form-control-sm bg-light text-success fw-bold" id="svc-price">— so'm</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold mb-1">Shifokor</label>
+                                    <select id="svc-doctor" class="form-select form-select-sm">
+                                        <option value="">— Tanlang —</option>
+                                        {% if patient.department %}
+                                            {% for doc in patient.department.doctor_set.all %}
+                                            <option value="{{ doc.pk }}">{{ doc.full_name }}</option>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold mb-1">Izoh</label>
+                                    <textarea id="svc-notes" class="form-control form-control-sm" rows="2"></textarea>
+                                </div>
+
+                                <button type="button" class="btn btn-primary w-100" id="btn-add-to-cart">
+                                    ➕ Savatga qo'shish
+                                </button>
+                                <div id="add-cart-error" class="alert alert-danger mt-2 py-2" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- O'NG: Savat -->
+                    <div class="col-md-6">
+                        <div class="card border h-100">
+                            <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                                <strong>🛒 Savat <span class="badge bg-success" id="cart-count">0</span></strong>
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="btn-clear-cart">
+                                    🗑 Tozalash
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="cart-empty" class="text-center text-muted py-5 cart-empty">
+                                    Hali xizmat tanlanmagan.<br>
+                                    Chapdan xizmat tanlang ➜
+                                </div>
+                                <table class="table cart-table mb-0" id="cart-table" style="display:none;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Xizmat</th>
+                                            <th class="text-center">Soni</th>
+                                            <th class="text-end">Jami</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cart-body"></tbody>
+                                    <tfoot>
+                                        <tr class="cart-total-row">
+                                            <td colspan="2">Jami:</td>
+                                            <td class="text-end text-success" id="cart-grand-total">0 so'm</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /row -->
+
+                <div id="save-error" class="alert alert-danger mt-3" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bekor</button>
+                <button type="button" class="btn btn-success btn-lg px-5" id="btn-save-all" disabled>
+                    ✅ Barchasini saqlash (<span id="save-count">0</span> ta)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- TAHRIRLASH MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">✏️ Yangilash</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Holat</label>
+                    <select id="edit-status" class="form-select">
+                        <option value="ordered">Buyurtma berildi</option>
+                        <option value="in_progress">Bajarilmoqda</option>
+                        <option value="completed">Bajarildi</option>
+                        <option value="cancelled">Bekor qilindi</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Natija</label>
+                    <textarea id="edit-result" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div id="edit-error" class="alert alert-danger" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Bekor</button>
+                <button type="button" class="btn btn-primary" id="btn-update">Saqlash</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PATIENT_ID = {{ patient.pk }};
+const ADD_URL    = "{% url 'add_service' patient.pk %}";
+const SEARCH_URL = "{% url 'service_search' %}";
+const CSRF       = "{{ csrf_token }}";
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ===== JADVAL FILTRI =====
+    document.querySelectorAll('.cat-filter').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.cat-filter').forEach(b => {
+                b.className = 'btn btn-sm btn-outline-primary cat-filter';
+            });
+            this.className = 'btn btn-sm btn-primary cat-filter';
+            const cat = this.dataset.cat;
+            document.querySelectorAll('#services-table tbody tr[data-cat]').forEach(row => {
+                row.style.display = (!cat || row.dataset.cat === cat) ? '' : 'none';
+            });
+        });
+    });
+
+    // ===== SAVAT =====
+    let cart = []; // [{id, name, category, price, qty, doctor_id, notes}]
+    let selId = null, selName = '', selPrice = 0, selCat = '';
+
+    function renderCart() {
+        const body  = document.getElementById('cart-body');
+        const empty = document.getElementById('cart-empty');
+        const table = document.getElementById('cart-table');
+        const count = document.getElementById('cart-count');
+        const total = document.getElementById('cart-grand-total');
+        const saveBtn = document.getElementById('btn-save-all');
+        const saveCount = document.getElementById('save-count');
+
+        count.textContent = cart.length;
+        saveCount.textContent = cart.length;
+        saveBtn.disabled = cart.length === 0;
+
+        if (cart.length === 0) {
+            empty.style.display = 'block';
+            table.style.display = 'none';
+            return;
+        }
+        empty.style.display = 'none';
+        table.style.display = '';
+
+        let grand = 0;
+        body.innerHTML = cart.map((item, idx) => {
+            const rowTotal = item.price * item.qty;
+            grand += rowTotal;
+            return `
+            <tr>
+                <td>
+                    <div class="fw-semibold small">${item.name}</div>
+                    <small class="text-muted">${item.category}</small>
+                </td>
+                <td class="text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-1">
+                        <button class="btn btn-outline-secondary btn-sm px-2 py-0"
+                                onclick="changeQty(${idx}, -1)">−</button>
+                        <span class="mx-1">${item.qty}</span>
+                        <button class="btn btn-outline-secondary btn-sm px-2 py-0"
+                                onclick="changeQty(${idx}, 1)">+</button>
+                    </div>
+                </td>
+                <td class="text-end text-success fw-semibold small">
+                    ${rowTotal.toLocaleString()} so'm
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-outline-danger btn-sm px-2 py-0"
+                            onclick="removeFromCart(${idx})">✕</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        total.textContent = `${grand.toLocaleString()} so'm`;
+    }
+
+    window.changeQty = function(idx, delta) {
+        cart[idx].qty = Math.max(1, cart[idx].qty + delta);
+        renderCart();
+    };
+
+    window.removeFromCart = function(idx) {
+        cart.splice(idx, 1);
+        renderCart();
+    };
+
+    // ===== QIDIRUV =====
+    const svcSearch   = document.getElementById('svc-search');
+    const svcDropdown = document.getElementById('svc-dropdown');
+    const svcPriceEl  = document.getElementById('svc-price');
+
+    function fetchSvc(q) {
+        const url = `${SEARCH_URL}?q=${encodeURIComponent(q)}&category=${selCat}&patient_id=${PATIENT_ID}`;
+        svcDropdown.innerHTML = '<div class="svc-item text-muted">⏳ Qidirilmoqda...</div>';
+        svcDropdown.style.display = 'block';
+
+        fetch(url)
+            .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(data => {
+                if (!data.length) {
+                    svcDropdown.innerHTML = '<div class="svc-item text-muted">🔍 Topilmadi</div>';
+                    return;
+                }
+                svcDropdown.innerHTML = data.map(s =>
+                    `<div class="svc-item" data-id="${s.id}"
+                          data-name="${s.name.replace(/"/g,'&quot;')}"
+                          data-cat="${s.category}"
+                          data-price="${s.price}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold">${s.name}</span>
+                                <span class="text-muted small ms-2">${s.category}</span>
+                            </div>
+                            <span class="price-pill">${Number(s.price).toLocaleString()} so'm</span>
+                        </div>
+                    </div>`
+                ).join('');
+
+                svcDropdown.querySelectorAll('.svc-item').forEach(item => {
+                    item.addEventListener('click', function () {
+                        selId    = this.dataset.id;
+                        selName  = this.dataset.name;
+                        selPrice = parseFloat(this.dataset.price);
+                        selCatName = this.dataset.cat;
+                        svcSearch.value = selName;
+                        svcPriceEl.textContent = `${selPrice.toLocaleString()} so'm`;
+                        svcDropdown.style.display = 'none';
+                        document.getElementById('svc-qty').focus();
+                    });
+                });
+            })
+            .catch(err => {
+                svcDropdown.innerHTML = `<div class="svc-item text-danger">❌ Xato: ${err.message}</div>`;
+            });
+    }
+
+    svcSearch.addEventListener('input', function () {
+        selId = null;
+        svcPriceEl.textContent = '— so\'m';
+        fetchSvc(this.value);
+    });
+
+    svcSearch.addEventListener('focus', () => fetchSvc(svcSearch.value));
+
+    document.addEventListener('click', e => {
+        if (!svcDropdown.contains(e.target) && e.target !== svcSearch) {
+            svcDropdown.style.display = 'none';
+        }
+    });
+
+    // Kategoriya filtri
+    document.querySelectorAll('.modal-cat-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.modal-cat-btn').forEach(b => {
+                b.className = b.className.replace('btn-primary', 'btn-outline-primary');
+            });
+            this.className = this.className.replace('btn-outline-primary', 'btn-primary');
+            selCat = this.dataset.cat;
+            fetchSvc(svcSearch.value);
+        });
+    });
+
+    // ===== SAVATGA QO'SHISH =====
+    document.getElementById('btn-add-to-cart').addEventListener('click', function () {
+        const errDiv = document.getElementById('add-cart-error');
+        errDiv.style.display = 'none';
+
+        if (!selId) {
+            errDiv.textContent = '⚠️ Avval xizmat tanlang!';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        const qty      = parseInt(document.getElementById('svc-qty').value) || 1;
+        const doctorId = document.getElementById('svc-doctor').value;
+        const notes    = document.getElementById('svc-notes').value;
+
+        // Bir xil xizmat avval qo'shilganmi?
+        const existing = cart.find(c => c.id === selId && c.doctor_id === doctorId);
+        if (existing) {
+            existing.qty += qty;
+        } else {
+            cart.push({
+                id: selId,
+                name: selName,
+                category: selCatName || '',
+                price: selPrice,
+                qty: qty,
+                doctor_id: doctorId,
+                notes: notes,
+            });
+        }
+
+        renderCart();
+
+        // Formani tozalash
+        selId = null; selName = ''; selPrice = 0;
+        svcSearch.value = '';
+        svcPriceEl.textContent = '— so\'m';
+        document.getElementById('svc-qty').value = 1;
+        document.getElementById('svc-notes').value = '';
+        svcSearch.focus();
+        fetchSvc('');
+
+        // Muvaffaqiyat xabari
+        errDiv.className = 'alert alert-success mt-2 py-2';
+        errDiv.textContent = '✅ Savatga qo\'shildi!';
+        errDiv.style.display = 'block';
+        setTimeout(() => { errDiv.style.display = 'none'; errDiv.className = 'alert alert-danger mt-2 py-2'; }, 1500);
+    });
+
+    // Savatni tozalash
+    document.getElementById('btn-clear-cart').addEventListener('click', function () {
+        if (cart.length && confirm('Savatni tozalashni tasdiqlaysizmi?')) {
+            cart = [];
+            renderCart();
+        }
+    });
+
+    // ===== BARCHASINI SAQLASH =====
+    document.getElementById('btn-save-all').addEventListener('click', async function () {
+        const errDiv = document.getElementById('save-error');
+        errDiv.style.display = 'none';
+
+        if (cart.length === 0) return;
+
+        this.disabled = true;
+        this.innerHTML = `⏳ Saqlanmoqda... (0/${cart.length})`;
+
+        let saved = 0, failed = 0;
+
+        for (let i = 0; i < cart.length; i++) {
+            const item = cart[i];
+            try {
+                const res = await fetch(ADD_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+                    body: JSON.stringify({
+                        service_id: item.id,
+                        quantity: item.qty,
+                        ordered_by_id: item.doctor_id || null,
+                        notes: item.notes || '',
+                    })
+                });
+                const data = await res.json();
+                if (data.success) saved++;
+                else failed++;
+            } catch {
+                failed++;
+            }
+            this.innerHTML = `⏳ Saqlanmoqda... (${saved + failed}/${cart.length})`;
+        }
+
+        if (failed === 0) {
+            window.location.reload();
+        } else {
+            errDiv.textContent = `${saved} ta saqlandi, ${failed} ta xato bо'ldi.`;
+            errDiv.style.display = 'block';
+            this.disabled = false;
+            this.innerHTML = `✅ Barchasini saqlash (<span id="save-count">${cart.length}</span> ta)`;
+        }
+    });
+
+    // Modal ochilganda
+    document.getElementById('addServiceModal').addEventListener('shown.bs.modal', function () {
+        cart = [];
+        renderCart();
+        selId = null; selPrice = 0; selCat = '';
+        svcSearch.value = '';
+        svcPriceEl.textContent = '— so\'m';
+        document.getElementById('svc-qty').value = 1;
+        document.getElementById('add-cart-error').style.display = 'none';
+        document.getElementById('save-error').style.display = 'none';
+        // Kategoriyani reset
+        document.querySelectorAll('.modal-cat-btn').forEach((b, i) => {
+            if (i === 0) b.className = b.className.replace('btn-outline-primary', 'btn-primary');
+            else b.className = b.className.replace('btn-primary', 'btn-outline-primary');
+        });
+        setTimeout(() => { fetchSvc(''); svcSearch.focus(); }, 150);
+    });
+
+    // ===== TAHRIRLASH =====
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.getElementById('edit-id').value = this.dataset.id;
+            document.getElementById('edit-status').value = this.dataset.status;
+            document.getElementById('edit-result').value = this.dataset.result || '';
+        });
+    });
+
+    document.getElementById('btn-update').addEventListener('click', function () {
+        const id = document.getElementById('edit-id').value;
+        const errDiv = document.getElementById('edit-error');
+        errDiv.style.display = 'none';
+        fetch(`/services/${id}/update/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({
+                status: document.getElementById('edit-status').value,
+                result: document.getElementById('edit-result').value,
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) window.location.reload();
+            else { errDiv.textContent = data.error || 'Xato'; errDiv.style.display = 'block'; }
+        });
+    });
+
+    // ===== O'CHIRISH =====
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', function () {
+            if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
+            fetch(`/services/${this.dataset.id}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': CSRF },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) this.closest('tr').remove();
+                else alert(data.error || "O'chirib bo'lmadi");
+            });
+        });
+    });
+
+}); // DOMContentLoaded
+</script>
+{% endblock %}

@@ -360,10 +360,20 @@ def patient_detail(request, pk):
     ])
     full_address = ', '.join(address_parts) or '—'
 
+    # Xizmatlar va jami narx
+    from apps.services.models import PatientService
+    from django.db.models import Sum
+    patient_services = PatientService.objects.filter(
+        patient_card=patient
+    ).select_related('service__category', 'ordered_by').order_by('-ordered_at')
+    services_total = patient_services.aggregate(total=Sum('price'))['total'] or 0
+
     return render(request, 'patients/patient_detail.html', {
         'patient': patient,
         'death_cause': death_cause,
         'full_address': full_address,
+        'patient_services': patient_services,
+        'services_total': services_total,
     })
 
 

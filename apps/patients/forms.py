@@ -167,6 +167,18 @@ class PatientCardForm(forms.ModelForm):
             return False
         return value == 'True' or value is True
 
+    def clean_is_war_veteran(self):
+        value = self.cleaned_data.get('is_war_veteran')
+        if isinstance(value, bool):
+            return value
+        return str(value) == 'True'
+
+    def clean_is_pensioner(self):
+        value = self.cleaned_data.get('is_pensioner')
+        if isinstance(value, bool):
+            return value
+        return str(value) == 'True'
+
     def clean_passport_serial(self):
         return self.cleaned_data.get('passport_serial', '').upper()
 
@@ -264,6 +276,7 @@ class ReceptionForm(forms.ModelForm):
             'street_address', 'workplace', 'position', 'hospital_type',
             'referral_type', 'referral_organization', 'hours_after_illness',
             'is_emergency', 'is_paid',
+            'is_war_veteran', 'is_pensioner',
             'attending_doctor',
             'department_head',
         ]
@@ -338,6 +351,18 @@ class ReceptionForm(forms.ModelForm):
         if not value:
             return False
         return value == 'True' or value is True
+
+    def clean_is_war_veteran(self):
+        value = self.cleaned_data.get('is_war_veteran')
+        if isinstance(value, bool):
+            return value
+        return str(value) == 'True'
+
+    def clean_is_pensioner(self):
+        value = self.cleaned_data.get('is_pensioner')
+        if isinstance(value, bool):
+            return value
+        return str(value) == 'True'
 
     def clean_passport_serial(self):
         return self.cleaned_data.get('passport_serial', '').upper()

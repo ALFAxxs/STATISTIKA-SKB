@@ -6,6 +6,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>📋 Bemor kartasi</h3>
     <div class="d-flex gap-2">
+        <a href="{% url 'patient_services' patient.pk %}" class="btn btn-info">
+            🏥 Xizmatlar
+            {% with cnt=patient.patient_services.count %}
+                {% if cnt %}<span class="badge bg-white text-dark">{{ cnt }}</span>{% endif %}
+            {% endwith %}
+        </a>
         <a href="{% url 'patient_edit' patient.pk %}" class="btn btn-warning">✏️ Tahrirlash</a>
         <a href="{% url 'patient_list' %}" class="btn btn-secondary">← Ro'yxatga</a>
         <a href="{% url 'patient_card_pdf' patient.pk %}" class="btn btn-danger">📄 PDF</a>
@@ -324,6 +330,66 @@
                 {{ patient.department_head|default:"—" }}
             </div>
         </div>
+    </div>
+</div>
+
+<!-- 9. Xizmatlar -->
+<div class="card mb-4">
+    <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center">
+        <strong>🏥 Bajarilgan xizmatlar
+            {% if patient_services %}
+                <span class="badge bg-info text-dark ms-1">{{ patient_services.count }} ta</span>
+            {% endif %}
+        </strong>
+        <a href="{% url 'patient_services' patient.pk %}" class="btn btn-sm btn-info">
+            + Boshqarish
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if patient_services %}
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Xizmat</th>
+                    <th>Kategoriya</th>
+                    <th>Shifokor</th>
+                    <th class="text-center">Miqdor</th>
+                    <th class="text-end">Narx</th>
+                    <th class="text-end pe-3">Jami</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for svc in patient_services %}
+                <tr>
+                    <td class="ps-3 fw-semibold">{{ svc.service.name }}</td>
+                    <td>
+                        <small class="text-muted">
+                            {{ svc.service.category.icon|default:"🏥" }}
+                            {{ svc.service.category.name }}
+                        </small>
+                    </td>
+                    <td><small>{{ svc.ordered_by|default:"—" }}</small></td>
+                    <td class="text-center">{{ svc.quantity }}</td>
+                    <td class="text-end">{{ svc.price|floatformat:0 }} so'm</td>
+                    <td class="text-end pe-3 fw-semibold">{{ svc.total_price|floatformat:0 }} so'm</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="5" class="text-end fw-bold">Jami summa:</td>
+                    <td class="text-end pe-3 fw-bold text-success fs-6">
+                        {{ services_total|floatformat:0 }} so'm
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            Hali xizmat qo'shilmagan.
+            <a href="{% url 'patient_services' patient.pk %}">+ Qo'shish</a>
+        </div>
+        {% endif %}
     </div>
 </div>
 

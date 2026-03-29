@@ -132,11 +132,12 @@
                 <td>{{ patient.medical_record_number }}</td>
                 <td>
                     {{ patient.full_name }}
-                    {% if patient.resident_status == 'non_resident' %}
+                    {% if patient.patient_category == 'railway' %}
+                        <span class="badge bg-primary ms-1" title="Temir yo'lchi">TY</span>
+                    {% elif patient.patient_category == 'paid' %}
+                        <span class="badge bg-success ms-1" title="Pullik">PL</span>
+                    {% elif patient.patient_category == 'non_resident' %}
                         <span class="badge bg-warning text-dark ms-1" title="Norezident">NR</span>
-                    {% endif %}
-                    {% if patient.patient_category == 'foreign' %}
-                        <span class="badge bg-info text-dark ms-1" title="Chet el">CE</span>
                     {% endif %}
                 </td>
                 <td>{{ patient.get_gender_display }}</td>

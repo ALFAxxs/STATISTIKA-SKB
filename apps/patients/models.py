@@ -192,7 +192,6 @@ class PatientCard(models.Model):
         ('railway', "Temir yo'lchi"),
         ('paid', 'Pullik'),
         ('non_resident', 'Norezident'),
-        ('foreign', 'Chet el fuqarosi'),
     ]
     patient_category = models.CharField(
         max_length=15,
