@@ -25,6 +25,7 @@ def statistics_dashboard(request):
     patient_category = request.GET.get('patient_category', '')
     resident_status = request.GET.get('resident_status', '')
     referral_type = request.GET.get('referral_type', '')
+    org_id = request.GET.get('org', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
 
@@ -55,6 +56,8 @@ def statistics_dashboard(request):
         qs = qs.filter(resident_status=resident_status)
     if referral_type:
         qs = qs.filter(referral_type=referral_type)
+    if org_id:
+        qs = qs.filter(workplace_org_id=org_id)
     if date_from:
         qs = qs.filter(admission_date__date__gte=date_from)
     if date_to:
@@ -121,6 +124,64 @@ def statistics_dashboard(request):
         for item in monthly_stats if item['month']
     ]
 
+    # ==================== TASHKILOT BO'YICHA ====================
+    from apps.services.models import PatientService
+    from django.db.models import Sum
+
+    org_stats = (
+        qs.filter(workplace_org__isnull=False)
+        .values(
+            'workplace_org__id',
+            'workplace_org__enterprise_name',
+            'workplace_org__branch_name',
+            'workplace_org__enterprise_code',
+            'workplace_org__branch_code',
+        )
+        .annotate(
+            patient_count=Count('id'),
+        )
+        .order_by('-patient_count')
+    )
+
+    # Har bir tashkilot uchun xizmatlar summasi
+    org_ids = [o['workplace_org__id'] for o in org_stats]
+    org_service_totals = {}
+    if org_ids:
+        svc_agg = (
+            PatientService.objects
+            .filter(patient_card__workplace_org_id__in=org_ids)
+            .values('patient_card__workplace_org_id')
+            .annotate(total=Sum('price'))
+        )
+        for s in svc_agg:
+            org_service_totals[s['patient_card__workplace_org_id']] = float(s['total'] or 0)
+
+    # org_stats ga xizmat summasi qo'shish
+    org_stats_list = []
+    for o in org_stats:
+        org_id = o['workplace_org__id']
+        name = o['workplace_org__enterprise_name'] or ''
+        branch = o['workplace_org__branch_name'] or ''
+        org_stats_list.append({
+            'id': org_id,
+            'name': f"{name} — {branch}" if branch else name,
+            'enterprise_code': o['workplace_org__enterprise_code'] or '',
+            'branch_code': o['workplace_org__branch_code'] or '',
+            'patient_count': o['patient_count'],
+            'service_total': org_service_totals.get(org_id, 0),
+        })
+
+    # Tashkilot bo'yicha bo'lim taqsimoti (top tashkilot uchun)
+    org_dept_stats = []
+    if org_stats_list:
+        top_org_id = org_stats_list[0]['id']
+        org_dept_stats = list(
+            qs.filter(workplace_org_id=top_org_id)
+            .values('department__name')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
+
     # ==================== IJTIMOIY HOLAT ====================
     social_stats = (
         qs.values('social_status')
@@ -184,7 +245,11 @@ def statistics_dashboard(request):
         'selected_category': patient_category,
         'selected_resident': resident_status,
         'selected_referral': referral_type,
+        'selected_org': org_id,
+        'org_selected_name': Organization.objects.get(pk=org_id).display_name if org_id and Organization.objects.filter(pk=org_id).exists() else '',
         'date_from': date_from,
         'date_to': date_to,
         'current_filters': current_filters,
+        'org_stats': org_stats_list,
+        'org_dept_stats': org_dept_stats,
     })

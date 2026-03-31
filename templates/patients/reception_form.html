@@ -124,9 +124,38 @@
                     </div>
 
                     <!-- Ish joyi -->
-                    <div class="col-md-3 mb-3" id="workplace-field">
-                        <label class="form-label">{{ form.workplace.label }}</label>
-                        {{ form.workplace }}
+                    <div class="col-md-6 mb-3" id="workplace-field">
+                        <label class="form-label fw-bold">
+                            Ish joyi
+                            <span class="badge bg-primary ms-1 small" id="railway-badge" style="display:none;">
+                                🚂 Temir yo'lchi
+                            </span>
+                        </label>
+                        <div id="org-search-block" style="display:none;">
+                            <div class="position-relative">
+                                <input type="text" id="org-search-input"
+                                       class="form-control"
+                                       placeholder="🔍 Korxona kodi, INN, nomi yoki filial..."
+                                       autocomplete="off">
+                                <div id="org-dropdown"
+                                     style="display:none; position:absolute; top:100%; left:0; right:0;
+                                            z-index:1050; background:#fff; border:1px solid #dee2e6;
+                                            border-radius:8px; max-height:280px; overflow-y:auto;
+                                            box-shadow:0 4px 16px rgba(0,0,0,.12);">
+                                </div>
+                            </div>
+                            <input type="hidden" name="workplace_org" id="workplace_org_id" value="">
+                            <div id="org-selected" class="mt-2" style="display:none;">
+                                <div class="alert alert-success py-2 mb-0 d-flex justify-content-between align-items-start">
+                                    <div id="org-selected-info" class="small"></div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                            id="org-clear">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="workplace-text-block">
+                            {{ form.workplace }}
+                        </div>
                     </div>
 
                     <!-- Lavozim -->
@@ -392,7 +421,109 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ==================== IJTIMOIY HOLAT ====================
     const socialStatus   = document.getElementById('id_social_status');
-    const workplaceField = document.getElementById('workplace-field');
+    const workplaceField  = document.getElementById('workplace-field');
+    const orgSearchInput  = document.getElementById('org-search-input');
+    const orgDropdown     = document.getElementById('org-dropdown');
+    const orgSearchBlock  = document.getElementById('org-search-block');
+    const orgTextBlock    = document.getElementById('workplace-text-block');
+    const orgSelected     = document.getElementById('org-selected');
+    const orgSelectedInfo = document.getElementById('org-selected-info');
+    const orgIdInput      = document.getElementById('workplace_org_id');
+    const railwayBadge    = document.getElementById('railway-badge');
+    const ORG_URL         = "{% url 'organization_search' %}";
+
+    // Kategoriya o'zgarganda ish joyi blokini yangilash
+    const catSelectR = document.getElementById('id_patient_category');
+    function updateOrgBlockR(cat) {
+        const isRailway = cat === 'railway';
+        // Temir yo'lchi bo'lsa — har doim org dropdown ko'rsatish
+        if (orgSearchBlock) orgSearchBlock.style.display = isRailway ? 'block' : 'none';
+        if (orgTextBlock)   orgTextBlock.style.display   = isRailway ? 'none'  : 'block';
+        if (railwayBadge)   railwayBadge.style.display   = isRailway ? 'inline-block' : 'none';
+        // Ish joyi maydonini ko'rsatish
+        if (workplaceField) workplaceField.style.display = 'block';
+    }
+    if (catSelectR) {
+        updateOrgBlockR(catSelectR.value);
+        catSelectR.addEventListener('change', () => updateOrgBlockR(catSelectR.value));
+    }
+
+    function fetchOrgsR(q) {
+        orgDropdown.innerHTML = '<div style="padding:10px;color:#888;">⏳ Qidirilmoqda...</div>';
+        orgDropdown.style.display = 'block';
+        fetch(`${ORG_URL}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.length) {
+                    orgDropdown.innerHTML = '<div style="padding:10px;color:#888;">Topilmadi</div>';
+                    return;
+                }
+                orgDropdown.innerHTML = data.map(org => `
+                    <div class="org-item" data-id="${org.id}"
+                         data-name="${org.enterprise_name.replace(/"/g,'&quot;')}"
+                         data-branch="${(org.branch_name||'').replace(/"/g,'&quot;')}"
+                         data-code="${org.enterprise_code}"
+                         data-inn="${org.enterprise_inn}"
+                         data-bcode="${org.branch_code}"
+                         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f1f1;">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold small">${org.enterprise_name}</div>
+                                ${org.branch_name ? `<div class="text-muted small">↳ ${org.branch_name}</div>` : ''}
+                            </div>
+                            <div class="text-end text-muted small ms-2">
+                                ${org.enterprise_code ? `<span class="badge bg-light text-dark border">${org.enterprise_code}</span>` : ''}
+                                ${org.branch_code ? `<span class="badge bg-light text-dark border ms-1">${org.branch_code}</span>` : ''}
+                                ${org.enterprise_inn ? `<div>INN: ${org.enterprise_inn}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>`).join('');
+                orgDropdown.querySelectorAll('.org-item').forEach(item => {
+                    item.addEventListener('mouseenter', () => item.style.background = '#e8f4fd');
+                    item.addEventListener('mouseleave', () => item.style.background = '');
+                    item.addEventListener('click', () => {
+                        orgIdInput.value = item.dataset.id;
+                        orgSearchInput.value = '';
+                        orgDropdown.style.display = 'none';
+                        orgSelected.style.display = 'block';
+                        let html = `<strong>${item.dataset.name}</strong>`;
+                        if (item.dataset.branch) html += `<br><span class="text-muted">↳ ${item.dataset.branch}</span>`;
+                        const b = [];
+                        if (item.dataset.code)  b.push(`Kod: ${item.dataset.code}`);
+                        if (item.dataset.bcode) b.push(`Filial: ${item.dataset.bcode}`);
+                        if (item.dataset.inn)   b.push(`INN: ${item.dataset.inn}`);
+                        if (b.length) html += `<br><small class="text-muted">${b.join(' | ')}</small>`;
+                        orgSelectedInfo.innerHTML = html;
+                        const wp = document.getElementById('id_workplace');
+                        if (wp && !wp.value) {
+                            wp.value = item.dataset.branch
+                                ? `${item.dataset.name} — ${item.dataset.branch}`
+                                : item.dataset.name;
+                        }
+                    });
+                });
+            }).catch(() => {
+                orgDropdown.innerHTML = '<div style="padding:10px;color:red;">❌ Xato</div>';
+            });
+    }
+
+    if (orgSearchInput) {
+        orgSearchInput.addEventListener('input', () => fetchOrgsR(orgSearchInput.value));
+        orgSearchInput.addEventListener('focus', () => fetchOrgsR(orgSearchInput.value));
+    }
+    document.addEventListener('click', e => {
+        if (orgDropdown && !orgDropdown.contains(e.target) && e.target !== orgSearchInput) {
+            orgDropdown.style.display = 'none';
+        }
+    });
+    const orgClearR = document.getElementById('org-clear');
+    if (orgClearR) orgClearR.addEventListener('click', () => {
+        orgIdInput.value = '';
+        orgSelected.style.display = 'none';
+        orgSelectedInfo.innerHTML = '';
+        orgSearchInput.value = '';
+        orgSearchInput.focus();
+    });
     const positionField  = document.getElementById('position-field');
 
     function toggleWorkplace() {

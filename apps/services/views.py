@@ -440,8 +440,6 @@ def export_services_excel(request):
     summary = [
         ('Jami xizmatlar soni', totals_agg['count'] or 0),
         ("Jami summa (so'm)", float(totals_agg['total'] or 0)),
-        ("To'langan (so'm)", float(totals_agg['paid'] or 0)),
-        ("Qarz (so'm)", float((totals_agg['total'] or 0) - (totals_agg['paid'] or 0))),
         ("Temir yo'lchilar daromadi (so'm)", float(totals_agg['railway'] or 0)),
         ("Norezidentlar daromadi (so'm)", float(totals_agg['nonresident'] or 0)),
     ]

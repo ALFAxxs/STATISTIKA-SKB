@@ -123,9 +123,17 @@ class DischargeConclusionAdmin(admin.ModelAdmin):
 
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ['name', 'is_active']
-    search_fields = ['name']
+    list_display = [
+        'enterprise_name', 'branch_name',
+        'enterprise_code', 'branch_code',
+        'enterprise_inn', 'is_active'
+    ]
+    search_fields = [
+        'enterprise_name', 'branch_name',
+        'enterprise_code', 'branch_code', 'enterprise_inn'
+    ]
     list_filter = ['is_active']
+    list_editable = ['is_active']
 
 
 @admin.register(Department)

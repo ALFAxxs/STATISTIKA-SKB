@@ -64,15 +64,46 @@ class Village(models.Model):
 
 
 class Organization(models.Model):
-    name = models.CharField(max_length=255)
+    # Korxona asosiy ma'lumotlari
+    enterprise_code = models.CharField(
+        max_length=20, blank=True, verbose_name="Korxona kodi"
+    )
+    enterprise_inn = models.CharField(
+        max_length=20, blank=True, verbose_name="Korxona INN"
+    )
+    enterprise_name = models.CharField(
+        max_length=500, verbose_name="Korxona nomi"
+    )
+    # Filial ma'lumotlari
+    branch_code = models.CharField(
+        max_length=20, blank=True, verbose_name="Filial kodi"
+    )
+    branch_name = models.CharField(
+        max_length=500, blank=True, verbose_name="Filial nomi"
+    )
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.name
+        if self.branch_name:
+            return f"{self.enterprise_name} — {self.branch_name}"
+        return self.enterprise_name
+
+    @property
+    def display_name(self):
+        parts = []
+        if self.enterprise_code:
+            parts.append(self.enterprise_code)
+        if self.branch_code:
+            parts.append(self.branch_code)
+        name = self.enterprise_name
+        if self.branch_name:
+            name += f" — {self.branch_name}"
+        return f"[{'/'.join(parts)}] {name}" if parts else name
 
     class Meta:
         verbose_name = "Muassasa"
         verbose_name_plural = "Muassasalar"
+        ordering = ['enterprise_name', 'branch_name']
 
 
 class Department(models.Model):
@@ -223,6 +254,13 @@ class PatientCard(models.Model):
     ]
     social_status = models.CharField(max_length=20, choices=SOCIAL_STATUS_CHOICES, blank=True)
     workplace = models.CharField(max_length=255, blank=True, verbose_name="Ish joyi / O'quv joyi")
+    workplace_org = models.ForeignKey(
+        Organization,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='employees',
+        verbose_name="Ish joyi (ro'yxatdan)"
+    )
     position = models.CharField(max_length=255, blank=True, verbose_name="Lavozimi")
 
     # --- Passport ---

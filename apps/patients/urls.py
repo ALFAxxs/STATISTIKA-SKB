@@ -20,10 +20,12 @@ urlpatterns = [
     path('ajax/villages/', views.get_villages, name='get_villages'),
     path('conclusion/add/', views.add_conclusion, name='add_conclusion'),
     path('ajax/doctors/', views.get_doctors, name='get_doctors'),
+    path('ajax/organizations/', views.organization_search, name='organization_search'),
 
     # --- pk li URL lar eng oxirda ---
     path('<int:pk>/', views.patient_detail, name='patient_detail'),
     path('<int:pk>/edit/', views.patient_card_edit, name='patient_edit'),
     path('<int:pk>/delete/', views.patient_delete, name='patient_delete'),
     path('<int:pk>/pdf/', views.patient_card_pdf, name='patient_card_pdf'),
+    path('<int:pk>/excel/', views.patient_card_excel, name='patient_card_excel'),
 ]

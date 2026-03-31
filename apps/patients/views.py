@@ -244,8 +244,128 @@ def patient_card_pdf(request, pk):
         ('TEXTCOLOR', (0, 0), (1, 0), colors.white),
         ('SPAN', (0, 0), (1, 0)),
     ]))
-
     elements.append(table)
+
+    # ===== XIZMATLAR BO'LIMI =====
+    from apps.services.models import PatientService
+    from django.db.models import Sum, Count
+    patient_services = PatientService.objects.filter(
+        patient_card=patient
+    ).select_related('service__category').order_by('service__category__name', 'service__name')
+
+    if patient_services.exists():
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph("BAJARILGAN XIZMATLAR", title_style))
+        elements.append(Spacer(1, 0.2*cm))
+
+        # Kategoriya bo'yicha guruhlash
+        cat_stats = patient_services.values(
+            'service__category__name',
+        ).annotate(
+            count=Count('id'),
+            total=Sum('price'),
+        ).order_by('service__category__name')
+
+        # Sarlavha
+        svc_header = [
+            Paragraph('Xizmat nomi', bold_style),
+            Paragraph('Miqdor', bold_style),
+            Paragraph("Narx (so'm)", bold_style),
+            Paragraph("Jami (so'm)", bold_style),
+        ]
+        svc_data = [svc_header]
+
+        grand_total = 0
+
+        for cat in cat_stats:
+            cat_name = cat['service__category__name']
+            cat_total = cat['total'] or 0
+            grand_total += float(cat_total)
+
+            # Kategoriya sarlavhasi
+            svc_data.append([
+                Paragraph(f"▶ {cat_name}", bold_style),
+                '', '', '',
+            ])
+
+            # Kategoriyaga tegishli xizmatlar
+            cat_services = patient_services.filter(
+                service__category__name=cat_name
+            )
+            for svc in cat_services:
+                svc_data.append([
+                    Paragraph(f"   {svc.service.name}", normal_style),
+                    Paragraph(str(svc.quantity), normal_style),
+                    Paragraph(f"{float(svc.price):,.0f}", normal_style),
+                    Paragraph(f"{float(svc.total_price):,.0f}", normal_style),
+                ])
+
+            # Kategoriya jami
+            svc_data.append([
+                Paragraph(f"   {cat_name} bo'yicha jami:", bold_style),
+                Paragraph(str(cat['count']), bold_style),
+                '',
+                Paragraph(f"{float(cat_total):,.0f}", bold_style),
+            ])
+
+        # Umumiy jami
+        svc_data.append([
+            Paragraph("UMUMIY JAMI:", bold_style),
+            '', '',
+            Paragraph(f"{grand_total:,.0f}", bold_style),
+        ])
+
+        svc_table = Table(
+            svc_data,
+            colWidths=[9*cm, 2*cm, 3.5*cm, 3.5*cm]
+        )
+
+        # Kategoriya satrlari indekslarini topish
+        cat_rows = []
+        total_rows = []
+        grand_row = len(svc_data) - 1
+        for i, row_data in enumerate(svc_data):
+            if i == 0:
+                continue
+            cell = row_data[0]
+            if hasattr(cell, 'text'):
+                txt = cell.text
+            else:
+                txt = str(cell)
+            if txt.startswith('▶'):
+                cat_rows.append(i)
+            elif "bo'yicha jami" in txt or 'jami' in txt.lower():
+                total_rows.append(i)
+
+        style_cmds = [
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.grey),
+            # Sarlavha
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            # Umumiy jami
+            ('BACKGROUND', (0, grand_row), (-1, grand_row), colors.HexColor('#1F4E79')),
+            ('TEXTCOLOR', (0, grand_row), (-1, grand_row), colors.white),
+            ('SPAN', (0, grand_row), (2, grand_row)),
+        ]
+        # Kategoriya satrlari
+        for r in cat_rows:
+            style_cmds += [
+                ('BACKGROUND', (0, r), (-1, r), colors.HexColor('#D6E4F0')),
+                ('SPAN', (0, r), (-1, r)),
+            ]
+        # Kategoriya jami satrlari
+        for r in total_rows:
+            style_cmds += [
+                ('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EBF5FB')),
+            ]
+
+        svc_table.setStyle(TableStyle(style_cmds))
+        elements.append(svc_table)
+
     doc.build(elements)
     buffer.seek(0)
 
@@ -580,3 +700,263 @@ def reception_create(request):
         'form': form,
         'title': 'Bemor qabul qilish',
     })
+@login_required
+def patient_card_excel(request, pk):
+    """Bemor kartasi + xizmatlar Excel export"""
+    patient = get_object_or_404(
+        PatientCard.objects.select_related(
+            'department', 'attending_doctor', 'department_head',
+            'referral_organization', 'country', 'region',
+            'district', 'city', 'discharge_conclusion'
+        ),
+        pk=pk
+    )
+
+    from apps.services.models import PatientService
+    from django.db.models import Sum, Count
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    # Stillar
+    BLUE   = PatternFill('solid', fgColor='1F4E79')
+    LBLUE  = PatternFill('solid', fgColor='D6E4F0')
+    LLBLUE = PatternFill('solid', fgColor='EBF5FB')
+    GREEN  = PatternFill('solid', fgColor='E9F7EF')
+    TOTAL  = PatternFill('solid', fgColor='1E8449')
+
+    W_FONT  = Font(color='FFFFFF', bold=True, size=10)
+    BOLD    = Font(bold=True, size=10)
+    NORMAL  = Font(size=10)
+    CENTER  = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    LEFT    = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    RIGHT   = Alignment(horizontal='right', vertical='center')
+    thin    = Side(style='thin')
+    BRD     = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    def cell(ws, row, col, value='', fill=None, font=None, align=LEFT):
+        c = ws.cell(row=row, column=col, value=value)
+        if fill:  c.fill  = fill
+        if font:  c.font  = font
+        c.alignment = align
+        c.border    = BRD
+        return c
+
+    def section_header(ws, row, title, ncols=2):
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+        c = ws.cell(row=row, column=1, value=title)
+        c.fill = LBLUE; c.font = BOLD; c.alignment = LEFT; c.border = BRD
+        ws.row_dimensions[row].height = 20
+        return row + 1
+
+    def info_row(ws, row, label, value):
+        cell(ws, row, 1, label, font=BOLD)
+        cell(ws, row, 2, str(value) if value else '—', font=NORMAL)
+        ws.row_dimensions[row].height = 18
+        return row + 1
+
+    # ===== 1-SAHIFA: BEMOR MA'LUMOTLARI =====
+    ws1 = wb.active
+    ws1.title = "Bemor ma'lumotlari"
+    ws1.column_dimensions['A'].width = 32
+    ws1.column_dimensions['B'].width = 42
+
+    address_parts = list(filter(None, [
+        str(patient.country)  if patient.country  else '',
+        str(patient.region)   if patient.region   else '',
+        str(patient.district) if patient.district else '',
+        str(patient.city)     if patient.city     else '',
+        patient.street_address or '',
+    ]))
+    full_address = ', '.join(address_parts) or '—'
+
+    ws1.merge_cells('A1:B1')
+    c = ws1.cell(row=1, column=1,
+                 value=f"BEMOR KARTASI — {patient.full_name} ({patient.medical_record_number})")
+    c.fill = BLUE; c.font = W_FONT; c.alignment = CENTER; c.border = BRD
+    ws1.row_dimensions[1].height = 30
+
+    r = 2
+    r = section_header(ws1, r, "SHAXSIY MA'LUMOTLAR")
+    r = info_row(ws1, r, "Bayonnoma raqami", patient.medical_record_number)
+    r = info_row(ws1, r, "Ism-familiya", patient.full_name)
+    r = info_row(ws1, r, "Jinsi", patient.get_gender_display())
+    r = info_row(ws1, r, "Tug'ilgan sana", patient.birth_date.strftime('%d.%m.%Y') if patient.birth_date else '—')
+    r = info_row(ws1, r, "Rezidentlik", patient.get_resident_status_display())
+    r = info_row(ws1, r, "Bemor kategoriyasi", patient.get_patient_category_display())
+    r = info_row(ws1, r, "Telefon", patient.phone or '—')
+    r = info_row(ws1, r, "Manzil", full_address)
+    r = info_row(ws1, r, "Ijtimoiy holat", patient.get_social_status_display() if patient.social_status else '—')
+    r = info_row(ws1, r, "Ish joyi", patient.workplace or '—')
+    r = info_row(ws1, r, "Lavozim", patient.position or '—')
+    r = info_row(ws1, r, "Passport", patient.passport_serial or '—')
+    r = info_row(ws1, r, "JSHSHIR", patient.JSHSHIR or '—')
+
+    r = section_header(ws1, r, "QABUL MA'LUMOTLARI")
+    r = info_row(ws1, r, "Qabul sanasi", patient.admission_date.strftime('%d.%m.%Y %H:%M') if patient.admission_date else '—')
+    r = info_row(ws1, r, "Bo'lim", str(patient.department) if patient.department else '—')
+    r = info_row(ws1, r, "Kim olib kelgan", patient.get_referral_type_display() if patient.referral_type else '—')
+    r = info_row(ws1, r, "Yo'llagan muassasa", str(patient.referral_organization) if patient.referral_organization else '—')
+    r = info_row(ws1, r, "Yo'llanma tashxisi", patient.referring_diagnosis or '—')
+    r = info_row(ws1, r, "Qabul tashxisi", patient.admission_diagnosis or '—')
+    r = info_row(ws1, r, "Kasallanishdan keyin", patient.get_hours_after_illness_display() if patient.hours_after_illness else '—')
+    r = info_row(ws1, r, "Shoshilinch", 'Ha' if patient.is_emergency else "Yo'q")
+    r = info_row(ws1, r, "Shifoxona turi", str(patient.hospital_type) if patient.hospital_type else '—')
+
+    r = section_header(ws1, r, "CHIQISH MA'LUMOTLARI")
+    r = info_row(ws1, r, "Yotgan kunlar", f"{patient.days_in_hospital} kun")
+    r = info_row(ws1, r, "Yakun", patient.get_outcome_display() if patient.outcome else '—')
+    r = info_row(ws1, r, "Chiqish xulosasi", str(patient.discharge_conclusion) if patient.discharge_conclusion else '—')
+    r = info_row(ws1, r, "Chiqish sanasi", patient.discharge_date.strftime('%d.%m.%Y') if patient.discharge_date else '—')
+
+    r = section_header(ws1, r, "YAKUNIY TASHXIS")
+    r = info_row(ws1, r, "Klinik tashxis (MKB-10)",
+                 f"{patient.clinical_main_diagnosis or ''} {patient.clinical_main_diagnosis_text or ''}".strip() or '—')
+    r = info_row(ws1, r, "Yo'ldosh kasalliklar", patient.clinical_comorbidities or '—')
+
+    r = section_header(ws1, r, "SHIFOKORLAR")
+    r = info_row(ws1, r, "Davolovchi shifokor", str(patient.attending_doctor) if patient.attending_doctor else '—')
+    r = info_row(ws1, r, "Bo'lim mudiri", str(patient.department_head) if patient.department_head else '—')
+
+    # ===== 2-SAHIFA: XIZMATLAR =====
+    ws2 = wb.create_sheet("Xizmatlar")
+    ws2.column_dimensions['A'].width = 40
+    ws2.column_dimensions['B'].width = 10
+    ws2.column_dimensions['C'].width = 18
+    ws2.column_dimensions['D'].width = 18
+
+    # Sarlavha
+    ws2.merge_cells('A1:D1')
+    c = ws2.cell(row=1, column=1,
+                 value=f"XIZMATLAR HISOBOTI — {patient.full_name}")
+    c.fill = BLUE; c.font = W_FONT; c.alignment = CENTER; c.border = BRD
+    ws2.row_dimensions[1].height = 30
+
+    # Bemor info
+    ws2.merge_cells('A2:D2')
+    c = ws2.cell(row=2, column=1,
+                 value=f"Bayonnoma: {patient.medical_record_number} | "
+                       f"Kategoriya: {patient.get_patient_category_display()} | "
+                       f"Qabul: {patient.admission_date.strftime('%d.%m.%Y') if patient.admission_date else '—'}")
+    c.font = NORMAL; c.alignment = LEFT; c.border = BRD
+    ws2.row_dimensions[2].height = 18
+
+    # Ustun sarlavhalar
+    headers = ['Xizmat nomi', 'Miqdor', "Narx (so'm)", "Jami (so'm)"]
+    for col, h in enumerate(headers, 1):
+        c = ws2.cell(row=3, column=col, value=h)
+        c.fill = BLUE; c.font = W_FONT
+        c.alignment = CENTER if col > 1 else LEFT
+        c.border = BRD
+    ws2.row_dimensions[3].height = 22
+
+    # Xizmatlar
+    patient_services = PatientService.objects.filter(
+        patient_card=patient
+    ).select_related('service__category').order_by('service__category__name', 'service__name')
+
+    cat_stats = patient_services.values(
+        'service__category__name'
+    ).annotate(
+        count=Count('id'),
+        total=Sum('price'),
+    ).order_by('service__category__name')
+
+    r = 4
+    grand_total = 0
+
+    for cat in cat_stats:
+        cat_name = cat['service__category__name']
+        cat_total = float(cat['total'] or 0)
+        grand_total += cat_total
+
+        # Kategoriya sarlavhasi
+        ws2.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        c = ws2.cell(row=r, column=1, value=f"▶  {cat_name}")
+        c.fill = LBLUE; c.font = BOLD; c.alignment = LEFT; c.border = BRD
+        ws2.row_dimensions[r].height = 20
+        r += 1
+
+        # Xizmatlar
+        cat_svcs = patient_services.filter(service__category__name=cat_name)
+        for svc in cat_svcs:
+            cell(ws2, r, 1, f"   {svc.service.name}", font=NORMAL)
+            cell(ws2, r, 2, svc.quantity, font=NORMAL, align=CENTER)
+            cell(ws2, r, 3, float(svc.price), font=NORMAL, align=RIGHT)
+            c4 = cell(ws2, r, 4, float(svc.total_price), font=NORMAL, align=RIGHT)
+            ws2.cell(row=r, column=3).number_format = '#,##0'
+            ws2.cell(row=r, column=4).number_format = '#,##0'
+            ws2.row_dimensions[r].height = 18
+            r += 1
+
+        # Kategoriya jami
+        ws2.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+        c = ws2.cell(row=r, column=1,
+                     value=f"   {cat_name} bo'yicha jami ({cat['count']} ta xizmat):")
+        c.fill = LLBLUE; c.font = BOLD; c.alignment = LEFT; c.border = BRD
+        c4 = ws2.cell(row=r, column=4, value=cat_total)
+        c4.fill = LLBLUE; c4.font = BOLD; c4.alignment = RIGHT
+        c4.border = BRD; c4.number_format = '#,##0'
+        ws2.row_dimensions[r].height = 20
+        r += 1
+
+    # Umumiy jami
+    ws2.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+    c = ws2.cell(row=r, column=1, value="UMUMIY JAMI:")
+    c.fill = TOTAL; c.font = W_FONT; c.alignment = LEFT; c.border = BRD
+    c4 = ws2.cell(row=r, column=4, value=grand_total)
+    c4.fill = TOTAL; c4.font = W_FONT; c4.alignment = RIGHT
+    c4.border = BRD; c4.number_format = '#,##0'
+    ws2.row_dimensions[r].height = 25
+
+    if not patient_services.exists():
+        ws2.merge_cells('A4:D4')
+        c = ws2.cell(row=4, column=1, value="Xizmatlar qo'shilmagan")
+        c.font = NORMAL; c.alignment = CENTER; c.border = BRD
+
+    # Response
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f"bemor_{patient.medical_record_number}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
+
+
+@login_required
+def organization_search(request):
+    """AJAX — ish joyi qidirish (temir yo'lchilar uchun)"""
+    q = request.GET.get('q', '').strip()
+
+    from .models import Organization
+    from django.db.models import Q
+
+    qs = Organization.objects.filter(is_active=True)
+
+    if q:
+        qs = qs.filter(
+            Q(enterprise_name__icontains=q) |
+            Q(branch_name__icontains=q) |
+            Q(enterprise_code__icontains=q) |
+            Q(branch_code__icontains=q) |
+            Q(enterprise_inn__icontains=q)
+        )
+
+    qs = qs.order_by('enterprise_name', 'branch_name')[:30]
+
+    data = []
+    for org in qs:
+        data.append({
+            'id': org.id,
+            'enterprise_code': org.enterprise_code,
+            'enterprise_inn': org.enterprise_inn,
+            'enterprise_name': org.enterprise_name,
+            'branch_code': org.branch_code,
+            'branch_name': org.branch_name,
+            'display': org.display_name,
+        })
+
+    return JsonResponse(data, safe=False)

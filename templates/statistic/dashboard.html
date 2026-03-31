@@ -4,115 +4,85 @@
 {% block content %}
 <h3 class="mb-3">📊 Statistika paneli</h3>
 
-<!-- ==================== FILTERLAR ==================== -->
+<!-- FILTERLAR -->
 <div class="card mb-4">
-    <div class="card-header bg-light">
-        <strong>🔍 Filterlar</strong>
-    </div>
+    <div class="card-header bg-light"><strong>🔍 Filterlar</strong></div>
     <div class="card-body">
-        <form method="get">
+        <form method="get" id="stat-filter-form">
             <div class="row g-2">
-
-                <!-- Sana oralig'i -->
                 <div class="col-md-2">
                     <label class="form-label small">Boshlanish sanasi</label>
-                    <input type="date" name="date_from" class="form-control form-control-sm"
-                           value="{{ date_from }}">
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small">Tugash sanasi</label>
-                    <input type="date" name="date_to" class="form-control form-control-sm"
-                           value="{{ date_to }}">
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
                 </div>
-
-                <!-- Yil -->
                 <div class="col-md-1">
                     <label class="form-label small">Yil</label>
                     <select name="year" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
                         {% for y in years %}
-                            <option value="{{ y }}"
-                                {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
-                                {{ y }}
-                            </option>
+                        <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <!-- Oy -->
                 <div class="col-md-1">
                     <label class="form-label small">Oy</label>
                     <select name="month" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
-                        {% for m in "123456789101112"|make_list %}{% endfor %}
-                        <option value="1" {% if selected_month == '1' %}selected{% endif %}>Yanvar</option>
-                        <option value="2" {% if selected_month == '2' %}selected{% endif %}>Fevral</option>
-                        <option value="3" {% if selected_month == '3' %}selected{% endif %}>Mart</option>
-                        <option value="4" {% if selected_month == '4' %}selected{% endif %}>Aprel</option>
-                        <option value="5" {% if selected_month == '5' %}selected{% endif %}>May</option>
-                        <option value="6" {% if selected_month == '6' %}selected{% endif %}>Iyun</option>
-                        <option value="7" {% if selected_month == '7' %}selected{% endif %}>Iyul</option>
-                        <option value="8" {% if selected_month == '8' %}selected{% endif %}>Avgust</option>
-                        <option value="9" {% if selected_month == '9' %}selected{% endif %}>Sentabr</option>
+                        <option value="1"  {% if selected_month == '1'  %}selected{% endif %}>Yanvar</option>
+                        <option value="2"  {% if selected_month == '2'  %}selected{% endif %}>Fevral</option>
+                        <option value="3"  {% if selected_month == '3'  %}selected{% endif %}>Mart</option>
+                        <option value="4"  {% if selected_month == '4'  %}selected{% endif %}>Aprel</option>
+                        <option value="5"  {% if selected_month == '5'  %}selected{% endif %}>May</option>
+                        <option value="6"  {% if selected_month == '6'  %}selected{% endif %}>Iyun</option>
+                        <option value="7"  {% if selected_month == '7'  %}selected{% endif %}>Iyul</option>
+                        <option value="8"  {% if selected_month == '8'  %}selected{% endif %}>Avgust</option>
+                        <option value="9"  {% if selected_month == '9'  %}selected{% endif %}>Sentabr</option>
                         <option value="10" {% if selected_month == '10' %}selected{% endif %}>Oktabr</option>
                         <option value="11" {% if selected_month == '11' %}selected{% endif %}>Noyabr</option>
                         <option value="12" {% if selected_month == '12' %}selected{% endif %}>Dekabr</option>
                     </select>
                 </div>
-
-                <!-- Bo'lim -->
                 {% if request.user.role == 'admin' or request.user.is_superuser %}
                 <div class="col-md-2">
                     <label class="form-label small">Bo'lim</label>
                     <select name="department" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
                         {% for dept in departments %}
-                            <option value="{{ dept.pk }}"
-                                {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>
-                                {{ dept.name }}
-                            </option>
+                        <option value="{{ dept.pk }}" {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 {% endif %}
-
-                <!-- Shifokor -->
                 <div class="col-md-2">
                     <label class="form-label small">Shifokor</label>
                     <select name="doctor" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
                         {% for doc in doctors %}
-                            <option value="{{ doc.pk }}"
-                                {% if selected_doctor == doc.pk|stringformat:"s" %}selected{% endif %}>
-                                {{ doc.full_name }}
-                            </option>
+                        <option value="{{ doc.pk }}" {% if selected_doctor == doc.pk|stringformat:"s" %}selected{% endif %}>{{ doc.full_name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <!-- Yakun -->
                 <div class="col-md-2">
                     <label class="form-label small">Yakun</label>
                     <select name="outcome" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
-                        <option value="discharged" {% if selected_outcome == 'discharged' %}selected{% endif %}>Chiqarildi</option>
-                        <option value="deceased" {% if selected_outcome == 'deceased' %}selected{% endif %}>Vafot etdi</option>
+                        <option value="discharged"  {% if selected_outcome == 'discharged'  %}selected{% endif %}>Chiqarildi</option>
+                        <option value="deceased"    {% if selected_outcome == 'deceased'    %}selected{% endif %}>Vafot etdi</option>
                         <option value="transferred" {% if selected_outcome == 'transferred' %}selected{% endif %}>O'tkazildi</option>
                     </select>
                 </div>
-
-                <!-- Status -->
                 <div class="col-md-2">
                     <label class="form-label small">Status</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
                         <option value="registered" {% if selected_status == 'registered' %}selected{% endif %}>🟡 Registratsiya</option>
-                        <option value="admitted" {% if selected_status == 'admitted' %}selected{% endif %}>🔵 Yotqizilgan</option>
-                        <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>🟢 Yakunlangan</option>
+                        <option value="admitted"   {% if selected_status == 'admitted'   %}selected{% endif %}>🔵 Yotqizilgan</option>
+                        <option value="completed"  {% if selected_status == 'completed'  %}selected{% endif %}>🟢 Yakunlangan</option>
                     </select>
                 </div>
-
-                <!-- Jins -->
                 <div class="col-md-1">
                     <label class="form-label small">Jins</label>
                     <select name="gender" class="form-select form-select-sm">
@@ -121,56 +91,70 @@
                         <option value="F" {% if selected_gender == 'F' %}selected{% endif %}>Ayol</option>
                     </select>
                 </div>
-
-                <!-- Kategoriya -->
                 <div class="col-md-2">
                     <label class="form-label small">Kategoriya</label>
                     <select name="patient_category" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
-                        <option value="railway" {% if selected_category == 'railway' %}selected{% endif %}>Temir yo'lchi</option>
-                        <option value="paid" {% if selected_category == 'paid' %}selected{% endif %}>Pullik</option>
+                        <option value="railway"      {% if selected_category == 'railway'      %}selected{% endif %}>Temir yo'lchi</option>
+                        <option value="paid"         {% if selected_category == 'paid'         %}selected{% endif %}>Pullik</option>
                         <option value="non_resident" {% if selected_category == 'non_resident' %}selected{% endif %}>Norezident</option>
                     </select>
                 </div>
-
-                <!-- Rezidentlik -->
                 <div class="col-md-2">
                     <label class="form-label small">Rezidentlik</label>
                     <select name="resident_status" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
-                        <option value="resident" {% if selected_resident == 'resident' %}selected{% endif %}>Rezident</option>
+                        <option value="resident"     {% if selected_resident == 'resident'     %}selected{% endif %}>Rezident</option>
                         <option value="non_resident" {% if selected_resident == 'non_resident' %}selected{% endif %}>Norezident</option>
                     </select>
                 </div>
-
-                <!-- Qabul turi -->
                 <div class="col-md-2">
                     <label class="form-label small">Qabul turi</label>
                     <select name="referral_type" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
-                        <option value="self" {% if selected_referral == 'self' %}selected{% endif %}>O'zi kelgan</option>
+                        <option value="self"      {% if selected_referral == 'self'      %}selected{% endif %}>O'zi kelgan</option>
                         <option value="ambulance" {% if selected_referral == 'ambulance' %}selected{% endif %}>Tez yordam</option>
-                        <option value="referral" {% if selected_referral == 'referral' %}selected{% endif %}>Yo'llanma</option>
-                        <option value="liniya" {% if selected_referral == 'liniya' %}selected{% endif %}>Liniya</option>
+                        <option value="referral"  {% if selected_referral == 'referral'  %}selected{% endif %}>Yo'llanma</option>
+                        <option value="liniya"    {% if selected_referral == 'liniya'    %}selected{% endif %}>Liniya</option>
                     </select>
                 </div>
 
-                <!-- Tugmalar -->
-                <div class="col-md-12 d-flex gap-2 mt-2">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        🔍 Filtrlash
-                    </button>
-                    <a href="{% url 'statistics_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                        ✕ Tozalash
-                    </a>
+                <!-- Ish joyi AJAX qidiruv -->
+                <div class="col-md-3">
+                    <label class="form-label small">🏢 Ish joyi</label>
+                    <div class="position-relative">
+                        <input type="text" id="org-filter-input"
+                               class="form-control form-control-sm"
+                               placeholder="Nom, kod yoki INN..."
+                               autocomplete="off"
+                               value="{{ org_selected_name }}">
+                        <input type="hidden" name="org" id="org-filter-id" value="{{ selected_org }}">
+                        <div id="org-filter-dropdown"
+                             style="display:none; position:absolute; top:100%; left:0; right:0;
+                                    z-index:2000; background:#fff; border:1px solid #dee2e6;
+                                    border-radius:6px; max-height:260px; overflow-y:auto;
+                                    box-shadow:0 4px 16px rgba(0,0,0,.15);">
+                        </div>
+                    </div>
+                    {% if selected_org and org_selected_name %}
+                    <div class="mt-1 d-flex align-items-center gap-2">
+                        <span class="badge bg-primary" style="font-size:11px;">{{ org_selected_name|truncatechars:30 }}</span>
+                        <button type="button" class="btn btn-link btn-sm text-danger p-0"
+                                id="org-filter-clear" style="font-size:12px;">✕ Tozalash</button>
+                    </div>
+                    {% endif %}
                 </div>
 
+                <div class="col-md-12 d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">🔍 Filtrlash</button>
+                    <a href="{% url 'statistics_dashboard' %}" class="btn btn-outline-secondary btn-sm">✕ Tozalash</a>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ==================== KARTOCHKALAR ==================== -->
+<!-- KARTOCHKALAR -->
 <div class="row g-2 mb-4">
     <div class="col-md-2">
         <div class="card border-primary text-center">
@@ -222,74 +206,55 @@
     </div>
 </div>
 
-<!-- Status kartochkalari -->
+<!-- Status -->
 <div class="row g-2 mb-4">
     <div class="col-md-4">
-        <div class="card text-center" style="border-color: #ffc107;">
-            <div class="card-body py-2">
-                <h4 class="mb-0">🟡 {{ registered }}</h4>
-                <small>Registratsiya qilingan</small>
-            </div>
+        <div class="card text-center" style="border-color:#ffc107;">
+            <div class="card-body py-2"><h4 class="mb-0">🟡 {{ registered }}</h4><small>Registratsiya</small></div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-center" style="border-color: #0d6efd;">
-            <div class="card-body py-2">
-                <h4 class="mb-0">🔵 {{ admitted }}</h4>
-                <small>Yotqizilgan</small>
-            </div>
+        <div class="card text-center" style="border-color:#0d6efd;">
+            <div class="card-body py-2"><h4 class="mb-0">🔵 {{ admitted }}</h4><small>Yotqizilgan</small></div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-center" style="border-color: #198754;">
-            <div class="card-body py-2">
-                <h4 class="mb-0">🟢 {{ completed }}</h4>
-                <small>Yakunlangan</small>
-            </div>
+        <div class="card text-center" style="border-color:#198754;">
+            <div class="card-body py-2"><h4 class="mb-0">🟢 {{ completed }}</h4><small>Yakunlangan</small></div>
         </div>
     </div>
 </div>
 
-<!-- ==================== GRAFIKLAR ==================== -->
+<!-- GRAFIKLAR -->
 <div class="row g-3 mb-4">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">Oylik dinamika</div>
-            <div class="card-body">
-                <canvas id="monthlyChart" height="100"></canvas>
-            </div>
+            <div class="card-body"><canvas id="monthlyChart" height="100"></canvas></div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Jins bo'yicha</div>
-            <div class="card-body">
-                <canvas id="genderChart"></canvas>
-            </div>
+            <div class="card-body"><canvas id="genderChart"></canvas></div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Kategoriya bo'yicha</div>
-            <div class="card-body">
-                <canvas id="categoryChart"></canvas>
-            </div>
+            <div class="card-body"><canvas id="categoryChart"></canvas></div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Kasallanish yakuni</div>
-            <div class="card-body">
-                <canvas id="outcomeChart"></canvas>
-            </div>
+            <div class="card-body"><canvas id="outcomeChart"></canvas></div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Qabul turi</div>
-            <div class="card-body">
-                <canvas id="emergencyChart"></canvas>
-            </div>
+            <div class="card-body"><canvas id="emergencyChart"></canvas></div>
         </div>
     </div>
 </div>
@@ -324,7 +289,6 @@
     </div>
 </div>
 
-<!-- Shifokor jadvali -->
 {% if doctor_stats %}
 <div class="card mb-4">
     <div class="card-header">Shifokorlar bo'yicha (Top 10)</div>
@@ -346,16 +310,51 @@
 </div>
 {% endif %}
 
-<!-- Export tugmalari -->
+<!-- TASHKILOT BO'YICHA STATISTIKA -->
+{% if org_stats %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>🏢 Tashkilot bo'yicha statistika</strong>
+        <span class="badge bg-secondary">{{ org_stats|length }} ta</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Tashkilot</th>
+                    <th class="text-center">Kod</th>
+                    <th class="text-center">Filial</th>
+                    <th class="text-center">Bemorlar</th>
+                    <th class="text-end pe-3">Xizmatlar summasi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for org in org_stats %}
+                <tr>
+                    <td class="ps-3"><span class="fw-semibold small">{{ org.name }}</span></td>
+                    <td class="text-center"><span class="badge bg-light text-dark border small">{{ org.enterprise_code|default:"—" }}</span></td>
+                    <td class="text-center"><span class="badge bg-light text-dark border small">{{ org.branch_code|default:"—" }}</span></td>
+                    <td class="text-center"><span class="badge bg-primary rounded-pill">{{ org.patient_count }}</span></td>
+                    <td class="text-end pe-3 fw-semibold text-success small">
+                        {% if org.service_total %}{{ org.service_total|floatformat:0 }} so'm
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white"><strong>📊 Tashkilotlar bo'yicha bemorlar soni</strong></div>
+    <div class="card-body"><canvas id="orgChart" height="80"></canvas></div>
+</div>
+{% endif %}
+
+<!-- Export -->
 <div class="d-flex gap-2 mb-5">
-    <a href="{% url 'export_excel' %}?{{ current_filters }}"
-       class="btn btn-success">
-        📥 Excel yuklab olish
-    </a>
-    <a href="{% url 'export_pdf' %}?{{ current_filters }}"
-       class="btn btn-danger">
-        📄 PDF yuklab olish
-    </a>
+    <a href="{% url 'export_excel' %}?{{ current_filters }}" class="btn btn-success">📥 Excel</a>
+    <a href="{% url 'export_pdf' %}?{{ current_filters }}" class="btn btn-danger">📄 PDF</a>
 </div>
 
 {% endblock %}
@@ -363,71 +362,158 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const genderData = {{ gender_data|safe }};
-const categoryData = {{ category_data|safe }};
+const genderData    = {{ gender_data|safe }};
+const categoryData  = {{ category_data|safe }};
 const monthlyLabels = {{ monthly_labels|safe }};
 const monthlyValues = {{ monthly_values|safe }};
 
-// Oylik
 new Chart(document.getElementById('monthlyChart'), {
     type: 'line',
     data: {
         labels: monthlyLabels,
-        datasets: [{
-            label: 'Bemorlar',
-            data: monthlyValues,
-            borderColor: '#0d6efd',
-            backgroundColor: 'rgba(13,110,253,0.1)',
-            tension: 0.3, fill: true
-        }]
+        datasets: [{ label: 'Bemorlar', data: monthlyValues,
+            borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
+            tension: 0.3, fill: true }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }
 });
 
-// Jins
 new Chart(document.getElementById('genderChart'), {
     type: 'doughnut',
-    data: {
-        labels: ['Erkak', 'Ayol'],
+    data: { labels: ['Erkak', 'Ayol'],
         datasets: [{ data: [genderData.M, genderData.F],
-                    backgroundColor: ['#0d6efd', '#e83e8c'] }]
-    },
+            backgroundColor: ['#0d6efd', '#e83e8c'] }] },
     options: { responsive: true }
 });
 
-// Kategoriya
 new Chart(document.getElementById('categoryChart'), {
     type: 'doughnut',
-    data: {
-        labels: ["Temir yo'lchi", 'Pullik', 'Norezident'],
-        datasets: [{ data: [
-            categoryData.railway, categoryData.paid,
-            categoryData.non_resident
-        ], backgroundColor: ['#0d6efd', '#ffc107', '#dc3545'] }]
-    },
+    data: { labels: ["Temir yo'lchi", 'Pullik', 'Norezident'],
+        datasets: [{ data: [categoryData.railway, categoryData.paid, categoryData.non_resident],
+            backgroundColor: ['#0d6efd', '#ffc107', '#dc3545'] }] },
     options: { responsive: true }
 });
 
-// Yakun
 new Chart(document.getElementById('outcomeChart'), {
     type: 'doughnut',
-    data: {
-        labels: ['Chiqarildi', 'Vafot', "O'tkazildi"],
+    data: { labels: ['Chiqarildi', 'Vafot', "O'tkazildi"],
         datasets: [{ data: [{{ discharged }}, {{ deceased }}, {{ transferred }}],
-                    backgroundColor: ['#198754', '#dc3545', '#ffc107'] }]
-    },
+            backgroundColor: ['#198754', '#dc3545', '#ffc107'] }] },
     options: { responsive: true }
 });
 
-// Shoshilinch
 new Chart(document.getElementById('emergencyChart'), {
     type: 'doughnut',
-    data: {
-        labels: ['Shoshilinch', 'Oddiy'],
+    data: { labels: ['Shoshilinch', 'Oddiy'],
         datasets: [{ data: [{{ emergency_count }}, {{ non_emergency_count }}],
-                    backgroundColor: ['#dc3545', '#6c757d'] }]
-    },
+            backgroundColor: ['#dc3545', '#6c757d'] }] },
     options: { responsive: true }
 });
+
+{% if org_stats %}
+new Chart(document.getElementById('orgChart'), {
+    type: 'bar',
+    data: {
+        labels: [{% for org in org_stats %}"{{ org.name|truncatechars:35 }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{ label: 'Bemorlar', data: [{% for org in org_stats %}{{ org.patient_count }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            backgroundColor: 'rgba(13,110,253,0.7)', borderRadius: 4 }]
+    },
+    options: { responsive: true, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+});
+{% endif %}
+
+// ===== ISH JOYI AJAX QIDIRUV =====
+(function() {
+    const input    = document.getElementById('org-filter-input');
+    const idInput  = document.getElementById('org-filter-id');
+    const dropdown = document.getElementById('org-filter-dropdown');
+    const clearBtn = document.getElementById('org-filter-clear');
+    if (!input) return;
+
+    let timer;
+
+    function doSearch(q) {
+        if (!dropdown) return;
+        dropdown.innerHTML = '<div style="padding:9px 14px;color:#888;font-size:13px;">⏳ Qidirilmoqda...</div>';
+        dropdown.style.display = 'block';
+
+        fetch('/patients/ajax/organizations/?q=' + encodeURIComponent(q))
+            .then(function(r) {
+                if (!r.ok) throw new Error('Server xatosi: ' + r.status);
+                return r.json();
+            })
+            .then(function(data) {
+                if (!data.length) {
+                    dropdown.innerHTML = '<div style="padding:9px 14px;color:#888;font-size:13px;">Topilmadi</div>';
+                    return;
+                }
+                var html = '';
+                data.forEach(function(org) {
+                    var label = org.enterprise_name + (org.branch_name ? ' — ' + org.branch_name : '');
+                    var meta = [];
+                    if (org.enterprise_code) meta.push('Kod: ' + org.enterprise_code);
+                    if (org.branch_code)     meta.push('Filial: ' + org.branch_code);
+                    if (org.enterprise_inn)  meta.push('INN: ' + org.enterprise_inn);
+
+                    html += '<div class="org-dd-item" data-id="' + org.id + '" data-label="' + label.replace(/"/g, '&quot;') + '"'
+                          + ' style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;">'
+                          + '<div style="font-size:13px;font-weight:600;color:#212529;">' + org.enterprise_name + '</div>';
+                    if (org.branch_name) {
+                        html += '<div style="font-size:12px;color:#6c757d;">↳ ' + org.branch_name + '</div>';
+                    }
+                    if (meta.length) {
+                        html += '<div style="font-size:11px;color:#adb5bd;">' + meta.join(' | ') + '</div>';
+                    }
+                    html += '</div>';
+                });
+                dropdown.innerHTML = html;
+
+                dropdown.querySelectorAll('.org-dd-item').forEach(function(item) {
+                    item.addEventListener('mouseover', function() { this.style.background = '#e8f4fd'; });
+                    item.addEventListener('mouseout',  function() { this.style.background = ''; });
+                    item.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                        idInput.value = this.dataset.id;
+                        input.value   = this.dataset.label;
+                        dropdown.style.display = 'none';
+                    });
+                });
+            })
+            .catch(function(err) {
+                dropdown.innerHTML = '<div style="padding:9px 14px;color:#dc3545;font-size:13px;">❌ ' + err.message + '</div>';
+            });
+    }
+
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var q = this.value;
+        timer = setTimeout(function() { doSearch(q); }, 250);
+    });
+
+    input.addEventListener('focus', function() {
+        doSearch(this.value);
+    });
+
+    input.addEventListener('blur', function() {
+        setTimeout(function() {
+            if (dropdown) dropdown.style.display = 'none';
+        }, 250);
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            idInput.value = '';
+            input.value   = '';
+            document.getElementById('stat-filter-form').submit();
+        });
+    }
+
+    document.getElementById('stat-filter-form').addEventListener('submit', function() {
+        if (!idInput.value) input.value = '';
+    });
+})();
 </script>
 {% endblock %}
