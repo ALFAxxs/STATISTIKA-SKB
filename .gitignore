@@ -52,3 +52,7 @@ htmlcov/
 # Celery
 celerybeat-schedule
 celerybeat.pid
+
+TY.xlsx
+db.sqlite3_org_archive
+skb_stat.zip
