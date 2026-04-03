@@ -68,7 +68,10 @@
                     <!-- Qabul qilish — faqat reception va admin -->
                     {% if request.user.role == 'reception' or request.user.role == 'admin' or request.user.is_superuser %}
                         <a href="{% url 'reception_create' %}" class="text-white text-decoration-none">
-                            📋 Qabul qilish
+                            📋 Statsionar qabul
+                        </a>
+                        <a href="{% url 'ambulatory_create' %}" class="text-white text-decoration-none">
+                            🚶 Ambulator qabul
                         </a>
                     {% endif %}
 

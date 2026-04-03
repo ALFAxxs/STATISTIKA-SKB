@@ -224,6 +224,14 @@ class PatientCard(models.Model):
         ('paid', 'Pullik'),
         ('non_resident', 'Norezident'),
     ]
+    # resident_status endi patient_category dan aniqlanadi
+    @property
+    def is_non_resident(self):
+        return self.patient_category == 'non_resident'
+
+    @property
+    def resident_status_display(self):
+        return 'Norezident' if self.patient_category == 'non_resident' else 'Rezident'
     patient_category = models.CharField(
         max_length=15,
         choices=PATIENT_CATEGORY_CHOICES,
@@ -296,11 +304,25 @@ class PatientCard(models.Model):
     is_emergency = models.BooleanField(default=False)
     is_paid = models.BooleanField(default=False)
     is_pensioner = models.BooleanField(default=False, verbose_name="Pensioner")
+    # is_pensioner endi social_status='pensioner' dan avtomatik aniqlanadi
+    # BooleanField qoldirildi (eski ma'lumotlar uchun)
 
     # --- Shifoxona turi ---
     hospital_type = models.ForeignKey(
         HospitalType, on_delete=models.SET_NULL, null=True, blank=True,
         verbose_name="Shifoxona turi"
+    )
+
+    # --- Statsionar/Ambulator ---
+    IS_AMBULATORY_CHOICES = [
+        ('inpatient', 'Statsionar (yotqizilgan)'),
+        ('ambulatory', 'Ambulator (kunlik)'),
+    ]
+    visit_type = models.CharField(
+        max_length=15,
+        choices=IS_AMBULATORY_CHOICES,
+        default='inpatient',
+        verbose_name="Tashrif turi"
     )
 
     # --- Yotqizilgan ---
@@ -367,6 +389,9 @@ class PatientCard(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        # is_pensioner social_status dan avtomatik
+        if self.social_status == 'pensioner':
+            self.is_pensioner = True
         # Chiqish xulosasi qo'yilsa → completed
         if self.discharge_conclusion_id and self.status != 'completed':
             self.status = 'completed'
@@ -441,3 +466,45 @@ class ICD10Code(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.title_uz}"
+
+class DepartmentTransfer(models.Model):
+    """Bemor bo'limlar orasidagi ko'chirish tarixi"""
+    patient_card = models.ForeignKey(
+        PatientCard,
+        on_delete=models.CASCADE,
+        related_name='transfers',
+        verbose_name="Bemor kartasi"
+    )
+    from_department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='transfers_from',
+        verbose_name="Qayerdan"
+    )
+    to_department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='transfers_to',
+        verbose_name="Qayerga"
+    )
+    transferred_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Ko'chirish sanasi"
+    )
+    transferred_by = models.ForeignKey(
+        'users.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Kim ko'chirgan"
+    )
+    reason = models.TextField(blank=True, verbose_name="Sabab")
+
+    class Meta:
+        verbose_name = "Bo'lim ko'chirish"
+        verbose_name_plural = "Bo'lim ko'chirishlar"
+        ordering = ['-transferred_at']
+
+    def __str__(self):
+        return f"{self.patient_card} → {self.to_department}"

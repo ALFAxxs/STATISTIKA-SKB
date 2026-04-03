@@ -642,6 +642,68 @@ document.addEventListener('DOMContentLoaded', function () {
         if (deptSelect.value) loadDoctors(deptSelect.value);
     }
 
+
+    // ==================== QAYTA KELGAN BEMOR TEKSHIRUVI ====================
+    (function() {
+        const CHECK_URL = "/patients/ajax/check-patient/";
+        const jshshirInput  = document.getElementById('id_JSHSHIR');
+        const passportInput = document.getElementById('id_passport_serial');
+
+        let alertDiv = document.getElementById('repeat-patient-alert');
+        if (!alertDiv) {
+            alertDiv = document.createElement('div');
+            alertDiv.id = 'repeat-patient-alert';
+            alertDiv.className = 'alert alert-warning';
+            alertDiv.style.display = 'none';
+            const firstSection = document.querySelector('.form-section') || document.querySelector('form');
+            if (firstSection) firstSection.prepend(alertDiv);
+        }
+
+        function checkPatient(jshshir, passport) {
+            const params = new URLSearchParams();
+            if (jshshir)  params.set('jshshir', jshshir);
+            if (passport) params.set('passport', passport);
+            if (!jshshir && !passport) { alertDiv.style.display = 'none'; return; }
+
+            fetch(CHECK_URL + '?' + params.toString())
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.found) { alertDiv.style.display = 'none'; return; }
+
+                    let html = '<strong>⚠️ Bu bemor avval ham murojaat qilgan:</strong><ul class="mb-0 mt-2">';
+                    data.patients.forEach(p => {
+                        const statusIcon = p.status_code === 'admitted' ? '🔵' :
+                                          p.status_code === 'completed' ? '🟢' : '🟡';
+                        html += `<li>
+                            <a href="/patients/${p.pk}/" target="_blank" class="fw-semibold">
+                                ${p.medical_record_number}
+                            </a>
+                            — ${p.full_name} |
+                            📅 ${p.admission_date} |
+                            🏥 ${p.department} |
+                            ${statusIcon} ${p.status}
+                            <span class="text-muted small"> | ${p.diagnosis}</span>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    alertDiv.innerHTML = html;
+                    alertDiv.style.display = 'block';
+                })
+                .catch(() => {});
+        }
+
+        let debounce;
+        function onInput() {
+            clearTimeout(debounce);
+            const jshshir  = jshshirInput  ? jshshirInput.value.trim()  : '';
+            const passport = passportInput ? passportInput.value.trim() : '';
+            debounce = setTimeout(() => checkPatient(jshshir, passport), 600);
+        }
+
+        if (jshshirInput)  jshshirInput.addEventListener('input', onInput);
+        if (passportInput) passportInput.addEventListener('input', onInput);
+    })();
+
 }); // DOMContentLoaded
 </script>
 {% endblock %}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><!-- templates/patients/invoice.html -->
+{% extends 'base.html' %}
+{% block title %}Hisob-faktura — {{ patient.full_name }}{% endblock %}
+
+{% block content %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: 1px solid #dee2e6 !important; }
+    }
+    .invoice-header { background: linear-gradient(135deg, #1F4E79, #2e6da4); color: #fff; }
+    .cat-header { background: #f0f4f8; font-weight: 600; font-size: 13px; }
+    .total-row { background: #1F4E79; color: #fff; font-weight: 700; }
+    .cat-total { background: #e8f0fe; font-weight: 600; }
+</style>
+
+<!-- Tugmalar -->
+<div class="d-flex gap-2 mb-3 no-print">
+    <a href="{% url 'patient_detail' patient.pk %}" class="btn btn-outline-secondary">← Bemor kartasi</a>
+    <button onclick="window.print()" class="btn btn-primary">🖨️ Chop etish</button>
+    <a href="{% url 'patient_services' patient.pk %}" class="btn btn-outline-info">🏥 Xizmatlar</a>
+</div>
+
+<!-- Hisob-faktura -->
+<div class="card shadow-sm" style="max-width: 860px; margin: 0 auto;">
+
+    <!-- Sarlavha -->
+    <div class="invoice-header p-4">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h4 class="mb-1">🏥 Hisob-faktura</h4>
+                <div class="opacity-75 small">Tibbiy xizmatlar uchun to'lov hujjati</div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold fs-5">№ {{ patient.medical_record_number }}</div>
+                <div class="opacity-75 small">{{ patient.admission_date|date:"d.m.Y" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bemor ma'lumotlari -->
+    <div class="card-body border-bottom">
+        <div class="row">
+            <div class="col-md-6">
+                <table class="table table-sm table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted small" style="width:140px">Bemor:</td>
+                        <td class="fw-semibold">{{ patient.full_name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Tug'ilgan sana:</td>
+                        <td>{{ patient.birth_date|date:"d.m.Y"|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Kategoriya:</td>
+                        <td>
+                            <span class="badge
+                                {% if patient.patient_category == 'railway' %}bg-primary
+                                {% elif patient.patient_category == 'paid' %}bg-success
+                                {% else %}bg-warning text-dark{% endif %}">
+                                {{ patient.get_patient_category_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% if patient.workplace_org %}
+                    <tr>
+                        <td class="text-muted small">Ish joyi:</td>
+                        <td class="small">{{ patient.workplace_org }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            <div class="col-md-6">
+                <table class="table table-sm table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted small" style="width:140px">Bo'lim:</td>
+                        <td>{{ patient.department|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Qabul sanasi:</td>
+                        <td>{{ patient.admission_date|date:"d.m.Y H:i"|default:"—" }}</td>
+                    </tr>
+                    {% if patient.discharge_date %}
+                    <tr>
+                        <td class="text-muted small">Chiqish sanasi:</td>
+                        <td>{{ patient.discharge_date|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Yotgan kunlar:</td>
+                        <td>{{ patient.days_in_hospital }} kun</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="text-muted small">Shifokor:</td>
+                        <td>{{ patient.attending_doctor|default:"—" }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Xizmatlar jadvali -->
+    <div class="card-body p-0">
+        {% if services %}
+        <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width:40%">Xizmat nomi</th>
+                    <th class="text-center" style="width:15%">Miqdor</th>
+                    <th class="text-end" style="width:20%">Birlik narxi</th>
+                    <th class="text-end pe-3" style="width:25%">Jami (so'm)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in cat_stats %}
+                <!-- Kategoriya sarlavhasi -->
+                <tr class="cat-header">
+                    <td colspan="4" class="ps-3 py-2">
+                        {{ cat.service__category__icon|default:"🏥" }}
+                        {{ cat.service__category__name }}
+                    </td>
+                </tr>
+                <!-- Kategoriya xizmatlari -->
+                {% for svc in services %}
+                    {% if svc.service.category.name == cat.service__category__name %}
+                    <tr>
+                        <td class="ps-4">{{ svc.service.name }}</td>
+                        <td class="text-center">{{ svc.quantity }}</td>
+                        <td class="text-end">{{ svc.price|floatformat:0 }}</td>
+                        <td class="text-end pe-3">{{ svc.total_price|floatformat:0 }}</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+                <!-- Kategoriya jami -->
+                <tr class="cat-total">
+                    <td colspan="3" class="text-end ps-3 py-1 small">
+                        {{ cat.service__category__name }} bo'yicha jami
+                        ({{ cat.count }} ta xizmat):
+                    </td>
+                    <td class="text-end pe-3 py-1">{{ cat.total|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <!-- Umumiy jami -->
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="3" class="ps-3 py-3 fs-6">UMUMIY JAMI:</td>
+                    <td class="text-end pe-3 py-3 fs-5">{{ grand_total|floatformat:0 }} so'm</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            Xizmatlar qo'shilmagan
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Imzo qismi -->
+    <div class="card-body border-top mt-2">
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="border-top pt-2 mt-4 text-muted small">
+                    Shifokor imzosi: _________________
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="border-top pt-2 mt-4 text-muted small">
+                    Bemor imzosi: _________________
+                </div>
+            </div>
+        </div>
+        <div class="text-muted small mt-3 text-center">
+            Sana: {{ patient.admission_date|date:"d.m.Y" }}
+        </div>
+    </div>
+</div>
+{% endblock %}
+</title>
+</head>
+<body>
+
+</body>
+</html>

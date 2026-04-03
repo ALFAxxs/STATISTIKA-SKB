@@ -127,7 +127,7 @@
                                class="form-control form-control-sm"
                                placeholder="Nom, kod yoki INN..."
                                autocomplete="off"
-                               value="{{ org_selected_name }}">
+                               value="">
                         <input type="hidden" name="org" id="org-filter-id" value="{{ selected_org }}">
                         <div id="org-filter-dropdown"
                              style="display:none; position:absolute; top:100%; left:0; right:0;
@@ -492,9 +492,10 @@ new Chart(document.getElementById('orgChart'), {
         timer = setTimeout(function() { doSearch(q); }, 250);
     });
 
-    input.addEventListener('focus', function() {
-        doSearch(this.value);
-    });
+input.addEventListener('focus', function() {
+    if (idInput && idInput.value) return;  // Tanlangan bo'lsa ochilmasin
+    if (this.value) doSearch(this.value);
+});
 
     input.addEventListener('blur', function() {
         setTimeout(function() {

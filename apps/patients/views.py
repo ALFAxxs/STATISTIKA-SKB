@@ -21,7 +21,8 @@ from django.utils import timezone
 from .forms import PatientCardForm, DeathCauseForm, SurgicalOperationFormSet, ReceptionForm
 from .models import (
     PatientCard, ICD10Code, DischargeConclusion,
-    Region, District, City, Village, Country, OperationType
+    Region, District, City, Village, Country, OperationType,
+    Department
 )
 
 
@@ -486,7 +487,20 @@ def patient_detail(request, pk):
     patient_services = PatientService.objects.filter(
         patient_card=patient
     ).select_related('service__category', 'ordered_by').order_by('-ordered_at')
-    services_total = patient_services.aggregate(total=Sum('price'))['total'] or 0
+    services_total = sum(s.price * s.quantity for s in patient_services) or 0
+
+    # Bemor tarixi — oldingi tashriflar
+    prev_visits = []
+    if patient.JSHSHIR:
+        prev_visits = PatientCard.objects.filter(
+            JSHSHIR=patient.JSHSHIR
+        ).exclude(pk=patient.pk).order_by('-admission_date')
+    elif patient.passport_serial:
+        prev_visits = PatientCard.objects.filter(
+            passport_serial=patient.passport_serial
+        ).exclude(pk=patient.pk).exclude(
+            passport_serial=''
+        ).order_by('-admission_date')
 
     return render(request, 'patients/patient_detail.html', {
         'patient': patient,
@@ -494,6 +508,8 @@ def patient_detail(request, pk):
         'full_address': full_address,
         'patient_services': patient_services,
         'services_total': services_total,
+        'prev_visits': prev_visits,
+        'departments': Department.objects.filter(is_active=True),
     })
 
 
@@ -960,3 +976,179 @@ def organization_search(request):
         })
 
     return JsonResponse(data, safe=False)
+
+
+@login_required
+def check_existing_patient(request):
+    """AJAX — JSHSHIR yoki passport bo'yicha oldingi tashriflarni tekshirish"""
+    jshshir   = request.GET.get('jshshir', '').strip()
+    passport  = request.GET.get('passport', '').strip()
+    exclude_pk = request.GET.get('exclude', '')
+
+    qs = PatientCard.objects.select_related('department', 'attending_doctor')
+
+    if jshshir:
+        matches = qs.filter(JSHSHIR=jshshir)
+    elif passport and len(passport) >= 5:
+        matches = qs.filter(passport_serial__iexact=passport)
+    else:
+        return JsonResponse({'found': False, 'patients': []})
+
+    if exclude_pk:
+        matches = matches.exclude(pk=exclude_pk)
+
+    matches = matches.order_by('-admission_date')[:5]
+
+    data = []
+    for p in matches:
+        data.append({
+            'pk': p.pk,
+            'full_name': p.full_name,
+            'medical_record_number': p.medical_record_number,
+            'admission_date': p.admission_date.strftime('%d.%m.%Y') if p.admission_date else '—',
+            'department': str(p.department) if p.department else '—',
+            'status': p.get_status_display(),
+            'status_code': p.status,
+            'outcome': p.get_outcome_display() if p.outcome else '—',
+            'diagnosis': p.admission_diagnosis[:60] if p.admission_diagnosis else '—',
+        })
+
+    return JsonResponse({'found': bool(data), 'patients': data})
+
+@login_required
+def patient_invoice(request, pk):
+    """Bemor uchun hisob-faktura"""
+    patient = get_object_or_404(PatientCard, pk=pk)
+
+    from apps.services.models import PatientService
+    from django.db.models import Sum, Count
+
+    services = PatientService.objects.filter(
+        patient_card=patient
+    ).select_related('service__category').order_by('service__category__name', 'service__name')
+
+    # Kategoriya bo'yicha guruhlash
+    cat_stats = services.values(
+        'service__category__name',
+        'service__category__icon',
+    ).annotate(
+        count=Count('id'),
+        total=Sum('price'),
+    ).order_by('service__category__name')
+
+    grand_total = services.aggregate(t=Sum('price'))['t'] or 0
+
+    return render(request, 'patients/invoice.html', {
+        'patient': patient,
+        'services': services,
+        'cat_stats': cat_stats,
+        'grand_total': grand_total,
+    })
+
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician')
+def transfer_department(request, pk):
+    """Bemorni boshqa bo'limga ko'chirish"""
+    from .models import DepartmentTransfer, Department
+    patient = get_object_or_404(PatientCard, pk=pk)
+
+    if request.method == 'POST':
+        new_dept_id = request.POST.get('department')
+        reason      = request.POST.get('reason', '')
+
+        if new_dept_id and str(new_dept_id) != str(patient.department_id):
+            try:
+                new_dept = Department.objects.get(pk=new_dept_id)
+                DepartmentTransfer.objects.create(
+                    patient_card=patient,
+                    from_department=patient.department,
+                    to_department=new_dept,
+                    transferred_by=request.user,
+                    reason=reason,
+                )
+                patient.department = new_dept
+                patient.save(update_fields=['department'])
+                messages.success(
+                    request,
+                    f"Bemor {new_dept.name} bo'limiga ko'chirildi."
+                )
+            except Department.DoesNotExist:
+                messages.error(request, "Bo'lim topilmadi.")
+        else:
+            messages.warning(request, "Yangi bo'lim tanlang.")
+
+    return redirect('patient_detail', pk=pk)
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician', 'reception')
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician', 'reception')
+def ambulatory_create(request):
+    """Ambulator (kunlik) bemor qabuli"""
+    from django.utils import timezone
+
+    def gen_record_number():
+        year = timezone.now().year
+        while True:
+            num = f"AMB-{year}-{str(uuid.uuid4())[:6].upper()}"
+            if not PatientCard.objects.filter(medical_record_number=num).exists():
+                return num
+
+    if request.method == 'POST':
+        # POST da forma validatsiyasiz kerakli maydonlarni to'g'ridan saqlash
+        record_number = request.POST.get('medical_record_number') or gen_record_number()
+        full_name     = request.POST.get('full_name', '').strip()
+        gender        = request.POST.get('gender', '')
+        birth_date    = request.POST.get('birth_date', '') or None
+        jshshir       = request.POST.get('JSHSHIR', '').strip()
+        phone         = request.POST.get('phone', '').strip()
+        category      = request.POST.get('patient_category', 'paid')
+        now           = timezone.now()
+
+        errors = {}
+        if not full_name:
+            errors['full_name'] = "Ism-familiyani kiriting"
+        if not gender:
+            errors['gender'] = "Jinsni tanlang"
+
+        if errors:
+            form = PatientCardForm(request.POST)
+            auto_number = record_number
+            return render(request, 'patients/ambulatory_form.html', {
+                'form': form,
+                'errors': errors,
+                'auto_record_number': auto_number,
+                'now': now.strftime('%Y-%m-%dT%H:%M'),
+            })
+
+        patient = PatientCard(
+            medical_record_number = record_number,
+            full_name     = full_name,
+            gender        = gender,
+            birth_date    = birth_date if birth_date else None,
+            JSHSHIR       = jshshir,
+            phone         = phone,
+            patient_category = category,
+            visit_type    = 'ambulatory',
+            status        = 'registered',
+            registered_by = request.user,
+            admission_date = now,
+        )
+        patient.save()
+        messages.success(request, f'Ambulator bemor {patient.full_name} qabul qilindi. Bayonnoma: {record_number}')
+        return redirect('patient_detail', pk=patient.pk)
+
+    # GET
+    auto_number = gen_record_number()
+    now = timezone.now()
+    form = PatientCardForm()
+    return render(request, 'patients/ambulatory_form.html', {
+        'form': form,
+        'auto_record_number': auto_number,
+        'now': now.strftime('%Y-%m-%dT%H:%M'),
+    })

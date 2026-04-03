@@ -9,6 +9,7 @@ urlpatterns = [
     path('create/', views.patient_card_create, name='patient_create'),
     path('operation-types/search/', views.operation_type_search, name='operation_type_search'),
     path('reception/', views.reception_create, name='reception_create'),
+    path('ambulatory/', views.ambulatory_create, name='ambulatory_create'),
 
 
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path('conclusion/add/', views.add_conclusion, name='add_conclusion'),
     path('ajax/doctors/', views.get_doctors, name='get_doctors'),
     path('ajax/organizations/', views.organization_search, name='organization_search'),
+    path('ajax/check-patient/', views.check_existing_patient, name='check_existing_patient'),
 
     # --- pk li URL lar eng oxirda ---
     path('<int:pk>/', views.patient_detail, name='patient_detail'),
@@ -28,4 +30,6 @@ urlpatterns = [
     path('<int:pk>/delete/', views.patient_delete, name='patient_delete'),
     path('<int:pk>/pdf/', views.patient_card_pdf, name='patient_card_pdf'),
     path('<int:pk>/excel/', views.patient_card_excel, name='patient_card_excel'),
+    path('<int:pk>/invoice/', views.patient_invoice, name='patient_invoice'),
+    path('<int:pk>/transfer/', views.transfer_department, name='transfer_department'),
 ]
