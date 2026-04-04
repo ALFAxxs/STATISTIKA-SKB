@@ -426,8 +426,8 @@
             </tbody>
             <tfoot class="table-light">
                 <tr>
-                    <td colspan="5" class="text-end fw-bold">Jami summa:</td>
-                    <td class="text-end pe-3 fw-bold text-success fs-6">
+                    <td colspan="5" class="text-end fw-bold">Xizmatlar jami:</td>
+                    <td class="text-end pe-3 fw-bold text-info">
                         {{ services_total|floatformat:0 }} so'm
                     </td>
                 </tr>
@@ -441,6 +441,77 @@
         {% endif %}
     </div>
 </div>
+
+<!-- 9b. Dori-darmonlar -->
+<div class="card mb-4">
+    <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+        <strong>💊 Dori-darmonlar
+            {% if patient_medicines %}
+                <span class="badge bg-warning text-dark ms-1">{{ patient_medicines.count }} ta</span>
+            {% endif %}
+        </strong>
+        <a href="{% url 'patient_services' patient.pk %}" class="btn btn-sm btn-warning text-dark">
+            + Boshqarish
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if patient_medicines %}
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Dori nomi</th>
+                    <th>Birlik</th>
+                    <th>Shifokor</th>
+                    <th class="text-center">Miqdori</th>
+                    <th class="text-end">Narxi</th>
+                    <th class="text-end pe-3">Jami</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for med in patient_medicines %}
+                <tr>
+                    <td class="ps-3 fw-semibold">{{ med.medicine.name }}</td>
+                    <td><small class="text-muted">{{ med.medicine.unit }}</small></td>
+                    <td><small>{{ med.ordered_by|default:"—" }}</small></td>
+                    <td class="text-center">{{ med.quantity }}</td>
+                    <td class="text-end">{{ med.price|floatformat:0 }} so'm</td>
+                    <td class="text-end pe-3 fw-semibold">{{ med.total_price|floatformat:0 }} so'm</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="5" class="text-end fw-bold">Dorilar jami:</td>
+                    <td class="text-end pe-3 fw-bold text-warning">
+                        {{ medicines_total|floatformat:0 }} so'm
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            Hali dori qo'shilmagan.
+            <a href="{% url 'patient_services' patient.pk %}">+ Qo'shish</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Umumiy jami -->
+{% if services_total or medicines_total %}
+<div class="card mb-4 border-success">
+    <div class="card-body py-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex gap-4">
+            <span class="text-muted small">Xizmatlar: <strong class="text-info">{{ services_total|floatformat:0 }} so'm</strong></span>
+            <span class="text-muted small">Dorilar: <strong class="text-warning">{{ medicines_total|floatformat:0 }} so'm</strong></span>
+        </div>
+        <div>
+            <strong class="text-muted me-2">Umumiy jami:</strong>
+            <strong class="text-success fs-5">{{ grand_total|floatformat:0 }} so'm</strong>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- 10. Bo'lim ko'chirish tarixi -->
 {% if patient.transfers.all %}

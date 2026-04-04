@@ -101,6 +101,20 @@ def patient_services(request, patient_pk):
         total=Sum('price'),
     ).order_by('-total')
 
+    # Bo'lim shifokorlari
+    if patient.department:
+        doctors = Doctor.objects.filter(
+            department=patient.department, is_active=True
+        ).order_by('-is_head', 'full_name')
+    else:
+        doctors = Doctor.objects.filter(is_active=True).order_by('full_name')
+
+    from .models import PatientMedicine
+    medicines = PatientMedicine.objects.filter(
+        patient_card=patient
+    ).select_related('medicine', 'ordered_by').order_by('-ordered_at')
+    medicines_total = sum(m.total_price for m in medicines)
+
     return render(request, 'services/patient_services.html', {
         'patient': patient,
         'services': services,
@@ -108,6 +122,9 @@ def patient_services(request, patient_pk):
         'total_price': total_price,
         'total_count': totals['count'] or 0,
         'cat_stats': cat_stats,
+        'doctors': doctors,
+        'medicines': medicines,
+        'medicines_total': medicines_total,
     })
 
 
@@ -169,12 +186,15 @@ def update_service(request, pk):
             result = data.get('result', '')
             is_paid = data.get('is_paid', False)
             performed_by_id = data.get('performed_by_id')
+            ordered_by_id = data.get('ordered_by_id')
 
             if status in dict(PatientService.STATUS_CHOICES):
                 ps.status = status
             ps.result = result
             ps.is_paid = is_paid
             ps.performed_by_id = performed_by_id if performed_by_id else None
+            if ordered_by_id is not None:
+                ps.ordered_by_id = ordered_by_id if ordered_by_id else None
 
             if status == 'completed' and not ps.performed_at:
                 ps.performed_at = timezone.now()
@@ -534,4 +554,324 @@ def export_services_pdf(request):
 
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="xizmatlar_hisoboti.pdf"'
+    return response
+
+# ==================== DORI-DARMON ====================
+
+@login_required
+def medicine_search(request):
+    """AJAX — dori qidirish"""
+    from .models import Medicine
+    q = request.GET.get('q', '').strip()
+    qs = Medicine.objects.filter(is_active=True)
+    if q:
+        qs = qs.filter(name__icontains=q)
+    qs = qs[:30]
+    data = [{'id': m.id, 'name': m.name, 'unit': m.unit} for m in qs]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician', 'reception')
+def add_medicine(request, patient_pk):
+    """Bemorga dori qo'shish — AJAX POST"""
+    from .models import Medicine, PatientMedicine
+    patient = get_object_or_404(PatientCard, pk=patient_pk)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            medicine_id  = data.get('medicine_id')
+            quantity     = data.get('quantity', 1)
+            price        = data.get('price', 0)
+            ordered_by_id = data.get('ordered_by_id')
+            notes        = data.get('notes', '')
+
+            from decimal import Decimal
+            medicine = Medicine.objects.get(pk=medicine_id, is_active=True)
+            pm = PatientMedicine.objects.create(
+                patient_card  = patient,
+                medicine      = medicine,
+                quantity      = Decimal(str(quantity)),
+                price         = Decimal(str(price)),
+                ordered_by_id = ordered_by_id or None,
+                notes         = notes,
+            )
+            return JsonResponse({
+                'success': True,
+                'id': pm.id,
+                'medicine_name': medicine.name,
+                'unit': medicine.unit,
+                'quantity': str(pm.quantity),
+                'price': str(pm.price),
+                'total': str(pm.total_price),
+                'ordered_by': pm.ordered_by.full_name if pm.ordered_by else '—',
+                'ordered_at': pm.ordered_at.strftime('%d.%m.%Y %H:%M'),
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False})
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician', 'reception')
+def update_medicine(request, pk):
+    """Dori yangilash — AJAX POST"""
+    from .models import PatientMedicine
+    from decimal import Decimal
+    pm = get_object_or_404(PatientMedicine, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            pm.quantity      = Decimal(str(data.get('quantity', pm.quantity)))
+            pm.price         = Decimal(str(data.get('price', pm.price)))
+            pm.ordered_by_id = data.get('ordered_by_id') or None
+            pm.notes         = data.get('notes', pm.notes)
+            pm.save()
+            return JsonResponse({
+                'success': True,
+                'total': str(pm.total_price),
+                'ordered_by': pm.ordered_by.full_name if pm.ordered_by else '—',
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False})
+
+
+@login_required
+@role_required('admin', 'doctor', 'statistician', 'reception')
+def delete_medicine(request, pk):
+    """Dori o'chirish — AJAX DELETE"""
+    from .models import PatientMedicine
+    pm = get_object_or_404(PatientMedicine, pk=pk)
+    if request.method == 'POST':
+        pm.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
+
+# ==================== DORI STATISTIKASI ====================
+
+@login_required
+def medicine_statistics(request):
+    """Dori-darmonlar statistikasi"""
+    from .models import Medicine, PatientMedicine
+    from django.db.models import Sum, Count, Q
+    from django.db.models.functions import TruncMonth, TruncDay, TruncYear
+
+    date_from   = request.GET.get('date_from', '')
+    date_to     = request.GET.get('date_to', '')
+    medicine_id = request.GET.get('medicine', '')
+    period      = request.GET.get('period', 'month')
+
+    qs = PatientMedicine.objects.select_related(
+        'medicine', 'patient_card', 'ordered_by'
+    )
+
+    if date_from:
+        qs = qs.filter(ordered_at__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(ordered_at__date__lte=date_to)
+    if medicine_id:
+        qs = qs.filter(medicine_id=medicine_id)
+
+    # Umumiy ko'rsatkichlar
+    totals = qs.aggregate(
+        total_records=Count('id'),
+        total_qty=Sum('quantity'),
+        total_sum=Sum('price'),
+        patients=Count('patient_card', distinct=True),
+    )
+
+    # Eng ko'p ishlatiladigan dorilar TOP-20
+    top_medicines = (
+        qs.values('medicine__name', 'medicine__unit', 'medicine_id')
+        .annotate(
+            rec_count=Count('id'),
+            total_qty=Sum('quantity'),
+            total_sum=Sum('price'),
+            patient_count=Count('patient_card', distinct=True),
+        )
+        .order_by('-total_sum')[:20]
+    )
+
+    # Dinamika (trend)
+    if period == 'day':
+        trunc_fn = TruncDay
+        fmt = '%d.%m.%Y'
+    elif period == 'year':
+        trunc_fn = TruncYear
+        fmt = '%Y'
+    else:
+        trunc_fn = TruncMonth
+        fmt = '%Y-%m'
+
+    trend = (
+        qs.annotate(period=trunc_fn('ordered_at'))
+        .values('period')
+        .annotate(total=Sum('price'), qty=Sum('quantity'), cnt=Count('id'))
+        .order_by('period')
+    )
+    trend_labels = [t['period'].strftime(fmt) for t in trend if t['period']]
+    trend_values = [float(t['total'] or 0) for t in trend if t['period']]
+
+    # Dorilar ro'yxati (filter uchun)
+    medicines_list = Medicine.objects.filter(is_active=True).order_by('name')
+
+    current_filters = request.GET.urlencode()
+
+    import json
+    return render(request, 'services/medicine_statistics.html', {
+        'totals': totals,
+        'top_medicines': top_medicines,
+        'trend_labels': json.dumps(trend_labels),
+        'trend_values': json.dumps(trend_values),
+        'medicines_list': medicines_list,
+        'date_from': date_from,
+        'date_to': date_to,
+        'selected_medicine': medicine_id,
+        'selected_period': period,
+        'current_filters': current_filters,
+    })
+
+
+@login_required
+def export_medicine_excel(request):
+    """Dori statistikasi Excel"""
+    from .models import PatientMedicine
+    from django.db.models import Sum, Count
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    date_from   = request.GET.get('date_from', '')
+    date_to     = request.GET.get('date_to', '')
+    medicine_id = request.GET.get('medicine', '')
+
+    qs = PatientMedicine.objects.select_related('medicine', 'patient_card', 'ordered_by')
+    if date_from: qs = qs.filter(ordered_at__date__gte=date_from)
+    if date_to:   qs = qs.filter(ordered_at__date__lte=date_to)
+    if medicine_id: qs = qs.filter(medicine_id=medicine_id)
+
+    GOLD  = PatternFill('solid', fgColor='856404')
+    LGOLD = PatternFill('solid', fgColor='FFF8E1')
+    WHITE = PatternFill('solid', fgColor='FFFFFF')
+    WFONT = Font(color='FFFFFF', bold=True, size=10)
+    BOLD  = Font(bold=True, size=10)
+    NORM  = Font(size=10)
+    CENTER = Alignment(horizontal='center', vertical='center')
+    LEFT   = Alignment(horizontal='left',   vertical='center')
+    RIGHT  = Alignment(horizontal='right',  vertical='center')
+    brd = Side(style='thin', color='CCCCCC')
+    BRD = Border(left=brd, right=brd, top=brd, bottom=brd)
+
+    wb = openpyxl.Workbook()
+
+    # Sheet 1 - Umumiy hisobot
+    ws1 = wb.active
+    ws1.title = "Hisobot"
+    ws1.column_dimensions['A'].width = 5
+    ws1.column_dimensions['B'].width = 35
+    ws1.column_dimensions['C'].width = 12
+    ws1.column_dimensions['D'].width = 14
+    ws1.column_dimensions['E'].width = 14
+    ws1.column_dimensions['F'].width = 18
+
+    ws1.merge_cells('A1:F1')
+    c = ws1.cell(row=1, column=1, value="DORI-DARMONLAR STATISTIKASI")
+    c.fill = GOLD; c.font = Font(color='FFFFFF', bold=True, size=13)
+    c.alignment = CENTER
+    ws1.row_dimensions[1].height = 30
+
+    if date_from or date_to:
+        ws1.merge_cells('A2:F2')
+        c = ws1.cell(row=2, column=1,
+            value=f"Davr: {date_from or '—'} dan {date_to or '—'} gacha")
+        c.font = BOLD; c.alignment = CENTER
+        ws1.row_dimensions[2].height = 18
+
+    heads = ['№', 'Dori nomi', 'Birlik', 'Jami miqdor', 'Bemorlar', "Jami summa (so'm)"]
+    for col, h in enumerate(heads, 1):
+        c = ws1.cell(row=3, column=col, value=h)
+        c.fill = GOLD; c.font = WFONT; c.alignment = CENTER; c.border = BRD
+    ws1.row_dimensions[3].height = 22
+
+    top = (
+        qs.values('medicine__name', 'medicine__unit')
+        .annotate(tq=Sum('quantity'), tp=Sum('price'), pc=Count('patient_card', distinct=True))
+        .order_by('-tp')
+    )
+
+    grand = 0
+    for ri, row in enumerate(top, 1):
+        tp = float(row['tp'] or 0)
+        grand += tp
+        data = [ri, row['medicine__name'], row['medicine__unit'],
+                float(row['tq'] or 0), row['pc'], tp]
+        for col, val in enumerate(data, 1):
+            c = ws1.cell(row=ri+3, column=col, value=val)
+            c.font = NORM
+            c.alignment = CENTER if col in (1,3,4,5) else (RIGHT if col==6 else LEFT)
+            c.border = BRD
+            if col == 6: c.number_format = '#,##0'
+            c.fill = LGOLD if ri % 2 == 0 else WHITE
+        ws1.row_dimensions[ri+3].height = 18
+
+    last = len(list(top)) + 4
+    ws1.merge_cells(start_row=last, start_column=1, end_row=last, end_column=5)
+    c = ws1.cell(row=last, column=1, value="JAMI:")
+    c.fill = GOLD; c.font = WFONT; c.alignment = LEFT; c.border = BRD
+    c6 = ws1.cell(row=last, column=6, value=grand)
+    c6.fill = GOLD; c6.font = WFONT; c6.alignment = RIGHT
+    c6.border = BRD; c6.number_format = '#,##0'
+    ws1.row_dimensions[last].height = 24
+
+    # Sheet 2 - Batafsil ro'yxat
+    ws2 = wb.create_sheet("Batafsil")
+    ws2.column_dimensions['A'].width = 5
+    ws2.column_dimensions['B'].width = 30
+    ws2.column_dimensions['C'].width = 30
+    ws2.column_dimensions['D'].width = 12
+    ws2.column_dimensions['E'].width = 14
+    ws2.column_dimensions['F'].width = 14
+    ws2.column_dimensions['G'].width = 20
+    ws2.column_dimensions['H'].width = 20
+
+    ws2.merge_cells('A1:H1')
+    c = ws2.cell(row=1, column=1, value="BATAFSIL RO'YXAT")
+    c.fill = GOLD; c.font = Font(color='FFFFFF', bold=True, size=12)
+    c.alignment = CENTER
+    ws2.row_dimensions[1].height = 26
+
+    heads2 = ['№', 'Bemor', 'Dori nomi', 'Birlik', 'Miqdori', "Narxi", "Jami", 'Sana']
+    for col, h in enumerate(heads2, 1):
+        c = ws2.cell(row=2, column=col, value=h)
+        c.fill = GOLD; c.font = WFONT; c.alignment = CENTER; c.border = BRD
+    ws2.row_dimensions[2].height = 22
+
+    for ri, pm in enumerate(qs.order_by('-ordered_at'), 1):
+        data = [
+            ri,
+            pm.patient_card.full_name,
+            pm.medicine.name,
+            pm.medicine.unit,
+            float(pm.quantity),
+            float(pm.price),
+            float(pm.total_price),
+            pm.ordered_at.strftime('%d.%m.%Y'),
+        ]
+        for col, val in enumerate(data, 1):
+            c = ws2.cell(row=ri+2, column=col, value=val)
+            c.font = NORM; c.border = BRD
+            c.alignment = CENTER if col in (1,4,5,8) else (RIGHT if col in (6,7) else LEFT)
+            if col in (6,7): c.number_format = '#,##0'
+            c.fill = LGOLD if ri % 2 == 0 else WHITE
+        ws2.row_dimensions[ri+2].height = 17
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="dori_statistika.xlsx"'
+    wb.save(response)
     return response

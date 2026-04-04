@@ -127,7 +127,7 @@
                                class="form-control form-control-sm"
                                placeholder="Nom, kod yoki INN..."
                                autocomplete="off"
-                               value="">
+                               value="{{ org_selected_name }}">
                         <input type="hidden" name="org" id="org-filter-id" value="{{ selected_org }}">
                         <div id="org-filter-dropdown"
                              style="display:none; position:absolute; top:100%; left:0; right:0;
@@ -352,6 +352,68 @@
 {% endif %}
 
 <!-- Export -->
+<!-- XIZMAT VA DORI UMUMIY JAMI -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row text-center g-2">
+            <div class="col-md-4">
+                <div class="text-muted small mb-1">Xizmatlar jami</div>
+                <div class="fw-bold text-info fs-5">{{ services_grand_total|floatformat:0 }} so'm</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small mb-1">Dorilar jami</div>
+                <div class="fw-bold text-warning fs-5">{{ medicines_grand_total|floatformat:0 }} so'm</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted small mb-1">Umumiy jami</div>
+                <div class="fw-bold text-success fs-4">{{ services_grand_total|add:medicines_grand_total|floatformat:0 }} so'm</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DORI STATISTIKASI -->
+{% if top_medicines %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>💊 Eng ko'p ishlatiladigan dorilar (Top 15)</strong>
+        <span class="badge bg-warning text-dark">{{ medicines_grand_total|floatformat:0 }} so'm</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3" style="width:40px">№</th>
+                    <th>Dori nomi</th>
+                    <th class="text-center">Birlik</th>
+                    <th class="text-center">Jami miqdor</th>
+                    <th class="text-center">Bemorlar</th>
+                    <th class="text-end pe-3">Jami summa</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for med in top_medicines %}
+                <tr>
+                    <td class="ps-3 text-muted">{{ forloop.counter }}</td>
+                    <td class="fw-semibold">{{ med.medicine__name }}</td>
+                    <td class="text-center"><span class="badge bg-light text-dark border">{{ med.medicine__unit }}</span></td>
+                    <td class="text-center">{{ med.total_qty|floatformat:0 }}</td>
+                    <td class="text-center"><span class="badge bg-primary rounded-pill">{{ med.patient_count }}</span></td>
+                    <td class="text-end pe-3 fw-semibold text-warning">{{ med.total_sum|floatformat:0 }} so'm</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="5" class="text-end fw-bold">Jami:</td>
+                    <td class="text-end pe-3 fw-bold text-warning">{{ medicines_grand_total|floatformat:0 }} so'm</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <div class="d-flex gap-2 mb-5">
     <a href="{% url 'export_excel' %}?{{ current_filters }}" class="btn btn-success">📥 Excel</a>
     <a href="{% url 'export_pdf' %}?{{ current_filters }}" class="btn btn-danger">📄 PDF</a>
@@ -492,10 +554,9 @@ new Chart(document.getElementById('orgChart'), {
         timer = setTimeout(function() { doSearch(q); }, 250);
     });
 
-input.addEventListener('focus', function() {
-    if (idInput && idInput.value) return;  // Tanlangan bo'lsa ochilmasin
-    if (this.value) doSearch(this.value);
-});
+    input.addEventListener('focus', function() {
+        doSearch(this.value);
+    });
 
     input.addEventListener('blur', function() {
         setTimeout(function() {

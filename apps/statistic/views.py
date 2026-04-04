@@ -182,6 +182,38 @@ def statistics_dashboard(request):
             .order_by('-count')
         )
 
+    # ==================== DORI STATISTIKASI ====================
+    from apps.services.models import PatientMedicine
+    from django.db.models import Sum as DSum
+
+    # Eng ko'p ishlatiladigan dorilar TOP-15
+    top_medicines = (
+        PatientMedicine.objects
+        .filter(patient_card__in=qs)
+        .values('medicine__name', 'medicine__unit')
+        .annotate(
+            total_qty=DSum('quantity'),
+            total_sum=DSum('price'),
+            patient_count=Count('patient_card', distinct=True),
+        )
+        .order_by('-total_sum')[:15]
+    )
+
+    # Umumiy dori xarajati
+    medicines_grand_total = (
+        PatientMedicine.objects
+        .filter(patient_card__in=qs)
+        .aggregate(t=DSum('price'))['t'] or 0
+    )
+
+    # Umumiy xizmat + dori jami
+    from decimal import Decimal
+    from apps.services.models import PatientService as PS
+    services_grand_total = sum(
+        float(ps.price) * ps.quantity
+        for ps in PS.objects.filter(patient_card__in=qs)
+    ) if qs.exists() else 0
+
     # ==================== IJTIMOIY HOLAT ====================
     social_stats = (
         qs.values('social_status')
@@ -251,5 +283,8 @@ def statistics_dashboard(request):
         'date_to': date_to,
         'current_filters': current_filters,
         'org_stats': org_stats_list,
+        'top_medicines': top_medicines,
+        'medicines_grand_total': float(medicines_grand_total),
+        'services_grand_total': services_grand_total,
         'org_dept_stats': org_dept_stats,
     })

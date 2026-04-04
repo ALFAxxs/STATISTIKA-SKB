@@ -367,6 +367,65 @@ def patient_card_pdf(request, pk):
         svc_table.setStyle(TableStyle(style_cmds))
         elements.append(svc_table)
 
+    # ===== DORI-DARMONLAR (PDF) =====
+    from apps.services.models import PatientMedicine
+    patient_medicines = PatientMedicine.objects.filter(
+        patient_card=patient
+    ).select_related('medicine', 'ordered_by').order_by('medicine__name')
+
+    if patient_medicines.exists():
+        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph("DORI-DARMONLAR", title_style))
+        elements.append(Spacer(1, 0.2*cm))
+
+        med_header = [
+            Paragraph('Dori nomi', bold_style),
+            Paragraph('Birlik', bold_style),
+            Paragraph('Miqdori', bold_style),
+            Paragraph("Narxi (so'm)", bold_style),
+            Paragraph("Jami (so'm)", bold_style),
+        ]
+        med_data = [med_header]
+        med_grand = 0
+
+        for med in patient_medicines:
+            tp = float(med.total_price)
+            med_grand += tp
+            med_data.append([
+                Paragraph(med.medicine.name, normal_style),
+                Paragraph(med.medicine.unit, normal_style),
+                Paragraph(str(med.quantity), normal_style),
+                Paragraph(f"{float(med.price):,.0f}", normal_style),
+                Paragraph(f"{tp:,.0f}", normal_style),
+            ])
+
+        med_data.append([
+            Paragraph('<b>JAMI:</b>', bold_style),
+            '', '', '',
+            Paragraph(f'<b>{med_grand:,.0f}</b>', bold_style),
+        ])
+
+        med_table = Table(
+            med_data,
+            colWidths=[6.5*cm, 2*cm, 2*cm, 3*cm, 3*cm],
+            repeatRows=1,
+        )
+        med_style = [
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#856404')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('GRID', (0,0), (-1,-1), 0.3, colors.grey),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor('#FFF8E1')]),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#856404')),
+            ('TEXTCOLOR', (0,-1), (-1,-1), colors.white),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('SPAN', (0,-1), (3,-1)),
+        ]
+        med_table.setStyle(TableStyle(med_style))
+        elements.append(med_table)
+
     doc.build(elements)
     buffer.seek(0)
 
@@ -502,12 +561,24 @@ def patient_detail(request, pk):
             passport_serial=''
         ).order_by('-admission_date')
 
+    # Dorilar
+    from apps.services.models import PatientMedicine
+    patient_medicines = PatientMedicine.objects.filter(
+        patient_card=patient
+    ).select_related('medicine', 'ordered_by').order_by('-ordered_at')
+    medicines_total = sum(m.total_price for m in patient_medicines) or 0
+
+    grand_total = float(services_total or 0) + float(medicines_total or 0)
+
     return render(request, 'patients/patient_detail.html', {
         'patient': patient,
         'death_cause': death_cause,
         'full_address': full_address,
         'patient_services': patient_services,
         'services_total': services_total,
+        'patient_medicines': patient_medicines,
+        'medicines_total': medicines_total,
+        'grand_total': grand_total,
         'prev_visits': prev_visits,
         'departments': Department.objects.filter(is_active=True),
     })
@@ -881,7 +952,7 @@ def patient_card_excel(request, pk):
     ).order_by('service__category__name')
 
     r = 4
-    grand_total = 0
+    grand_total = float(services_total or 0) + float(medicines_total or 0)
 
     for cat in cat_stats:
         cat_name = cat['service__category__name']
@@ -931,6 +1002,103 @@ def patient_card_excel(request, pk):
         ws2.merge_cells('A4:D4')
         c = ws2.cell(row=4, column=1, value="Xizmatlar qo'shilmagan")
         c.font = NORMAL; c.alignment = CENTER; c.border = BRD
+
+    # ===== SHEET 3: DORI-DARMONLAR =====
+    from apps.services.models import PatientMedicine as PMed
+    patient_medicines = PMed.objects.filter(
+        patient_card=patient
+    ).select_related('medicine', 'ordered_by').order_by('medicine__name')
+
+    ws3 = wb.create_sheet("Dori-darmonlar")
+    ws3.column_dimensions['A'].width = 5
+    ws3.column_dimensions['B'].width = 35
+    ws3.column_dimensions['C'].width = 12
+    ws3.column_dimensions['D'].width = 12
+    ws3.column_dimensions['E'].width = 18
+    ws3.column_dimensions['F'].width = 20
+
+    # Sarlavha
+    ws3.merge_cells('A1:F1')
+    c = ws3.cell(row=1, column=1, value=f"DORI-DARMONLAR — {patient.full_name}")
+    c.fill = PatternFill('solid', fgColor='856404')
+    c.font = Font(color='FFFFFF', bold=True, size=12)
+    c.alignment = CENTER; c.border = BRD
+    ws3.row_dimensions[1].height = 28
+
+    heads3 = ['№', 'Dori nomi', 'Birlik', 'Miqdori', "Narxi (so'm)", "Jami (so'm)"]
+    for col, h in enumerate(heads3, 1):
+        c = ws3.cell(row=2, column=col, value=h)
+        c.fill = PatternFill('solid', fgColor='856404')
+        c.font = Font(color='FFFFFF', bold=True, size=10)
+        c.alignment = CENTER; c.border = BRD
+    ws3.row_dimensions[2].height = 22
+
+    med_grand = 0
+    for ri, med in enumerate(patient_medicines, 1):
+        tp = float(med.total_price)
+        med_grand += tp
+        row_data = [ri, med.medicine.name, med.medicine.unit,
+                    float(med.quantity), float(med.price), tp]
+        for col, val in enumerate(row_data, 1):
+            c = ws3.cell(row=ri+2, column=col, value=val)
+            c.font = NORMAL
+            c.alignment = CENTER if col in (1,3,4) else (RIGHT if col in (5,6) else LEFT)
+            c.border = BRD
+            if col in (5,6): c.number_format = '#,##0'
+            if ri % 2 == 0: c.fill = PatternFill('solid', fgColor='FFF8E1')
+        ws3.row_dimensions[ri+2].height = 18
+
+    # Jami
+    last = patient_medicines.count() + 3
+    if last > 3:
+        ws3.merge_cells(start_row=last, start_column=1, end_row=last, end_column=5)
+        c = ws3.cell(row=last, column=1, value="JAMI:")
+        c.fill = PatternFill('solid', fgColor='856404')
+        c.font = Font(color='FFFFFF', bold=True, size=10)
+        c.alignment = LEFT; c.border = BRD
+        c6 = ws3.cell(row=last, column=6, value=med_grand)
+        c6.fill = PatternFill('solid', fgColor='856404')
+        c6.font = Font(color='FFFFFF', bold=True, size=10)
+        c6.alignment = RIGHT; c6.border = BRD
+        c6.number_format = '#,##0'
+        ws3.row_dimensions[last].height = 22
+    else:
+        ws3.merge_cells('A3:F3')
+        c = ws3.cell(row=3, column=1, value="Dori-darmonlar qo'shilmagan")
+        c.font = NORMAL; c.alignment = CENTER; c.border = BRD
+
+    # ===== SHEET 4: UMUMIY HISOB =====
+    ws4 = wb.create_sheet("Umumiy hisob")
+    ws4.column_dimensions['A'].width = 35
+    ws4.column_dimensions['B'].width = 25
+
+    ws4.merge_cells('A1:B1')
+    c = ws4.cell(row=1, column=1, value="UMUMIY HISOB")
+    c.fill = PatternFill('solid', fgColor='1F4E79')
+    c.font = Font(color='FFFFFF', bold=True, size=13)
+    c.alignment = CENTER; c.border = BRD
+    ws4.row_dimensions[1].height = 28
+
+    rows4 = [
+        ("Xizmatlar jami:", grand_total),
+        ("Dori-darmonlar jami:", med_grand),
+        ("UMUMIY JAMI:", grand_total + med_grand),
+    ]
+    fills4 = ['D6E4F0', 'FFF8E1', '145A32']
+    fonts4 = [
+        Font(bold=True, size=11),
+        Font(bold=True, size=11),
+        Font(color='FFFFFF', bold=True, size=13),
+    ]
+    for ri, ((label, val), fill, font) in enumerate(zip(rows4, fills4, fonts4), 2):
+        c1 = ws4.cell(row=ri, column=1, value=label)
+        c1.fill = PatternFill('solid', fgColor=fill)
+        c1.font = font; c1.alignment = LEFT; c1.border = BRD
+        c2 = ws4.cell(row=ri, column=2, value=val)
+        c2.fill = PatternFill('solid', fgColor=fill)
+        c2.font = font; c2.alignment = RIGHT; c2.border = BRD
+        c2.number_format = '#,##0'
+        ws4.row_dimensions[ri].height = 24
 
     # Response
     response = HttpResponse(
@@ -1020,28 +1188,50 @@ def patient_invoice(request, pk):
     """Bemor uchun hisob-faktura"""
     patient = get_object_or_404(PatientCard, pk=pk)
 
-    from apps.services.models import PatientService
+    from apps.services.models import PatientService, PatientMedicine
     from django.db.models import Sum, Count
+    from decimal import Decimal
 
     services = PatientService.objects.filter(
         patient_card=patient
     ).select_related('service__category').order_by('service__category__name', 'service__name')
 
-    # Kategoriya bo'yicha guruhlash
-    cat_stats = services.values(
-        'service__category__name',
-        'service__category__icon',
-    ).annotate(
-        count=Count('id'),
-        total=Sum('price'),
-    ).order_by('service__category__name')
+    # Kategoriya bo'yicha to'g'ri hisoblash (price * quantity)
+    from collections import defaultdict
+    cat_map = defaultdict(lambda: {'icon': '', 'count': 0, 'total': 0})
+    for s in services:
+        key = s.service.category.name
+        cat_map[key]['icon']  = s.service.category.icon or '🏥'
+        cat_map[key]['count'] += 1
+        cat_map[key]['total'] += float(s.price * s.quantity)
 
-    grand_total = services.aggregate(t=Sum('price'))['t'] or 0
+    cat_stats = [
+        {
+            'service__category__name': name,
+            'service__category__icon': v['icon'],
+            'count': v['count'],
+            'total': v['total'],
+        }
+        for name, v in sorted(cat_map.items())
+    ]
+
+    services_total = sum(s.price * s.quantity for s in services) or 0
+
+    # Dorilar
+    medicines = PatientMedicine.objects.filter(
+        patient_card=patient
+    ).select_related('medicine', 'ordered_by').order_by('medicine__name')
+
+    medicines_total = sum(m.total_price for m in medicines) or 0
+    grand_total = float(services_total) + float(medicines_total)
 
     return render(request, 'patients/invoice.html', {
         'patient': patient,
         'services': services,
         'cat_stats': cat_stats,
+        'services_total': services_total,
+        'medicines': medicines,
+        'medicines_total': medicines_total,
         'grand_total': grand_total,
     })
 

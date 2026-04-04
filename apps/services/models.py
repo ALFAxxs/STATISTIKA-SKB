@@ -182,3 +182,80 @@ class PatientService(models.Model):
         verbose_name = "Bemor xizmati"
         verbose_name_plural = "Bemor xizmatlari"
         ordering = ['-ordered_at']
+
+# ==================== DORI-DARMON ====================
+
+class Medicine(models.Model):
+    """Dori-darmon katalogi"""
+    UNIT_CHOICES = [
+        ('dona', 'dona'),
+        ('ml', 'ml'),
+        ('mg', 'mg'),
+        ('g', 'g'),
+        ('l', 'l'),
+        ('ampula', 'ampula'),
+        ('kapsula', 'kapsula'),
+        ('tabletka', 'tabletka'),
+        ('paket', 'paket'),
+        ('shisha', 'shisha'),
+        ('tuba', 'tuba'),
+    ]
+    name = models.CharField(max_length=255, verbose_name="Nomi")
+    unit = models.CharField(
+        max_length=20, choices=UNIT_CHOICES,
+        default='dona', verbose_name="Birlik"
+    )
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.unit})"
+
+    class Meta:
+        verbose_name = "Dori-darmon"
+        verbose_name_plural = "Dori-darmonlar"
+        ordering = ['name']
+
+
+class PatientMedicine(models.Model):
+    """Bemorga biriktirilgan dori"""
+    patient_card = models.ForeignKey(
+        PatientCard,
+        on_delete=models.CASCADE,
+        related_name='patient_medicines',
+        verbose_name="Bemor kartasi"
+    )
+    medicine = models.ForeignKey(
+        Medicine,
+        on_delete=models.PROTECT,
+        verbose_name="Dori"
+    )
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        default=1, verbose_name="Miqdori"
+    )
+    price = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        default=0, verbose_name="Narxi (so'm)"
+    )
+    ordered_by = models.ForeignKey(
+        Doctor,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='ordered_medicines',
+        verbose_name="Buyurtma bergan shifokor"
+    )
+    ordered_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, verbose_name="Izoh")
+
+    @property
+    def total_price(self):
+        from decimal import Decimal
+        return self.price * Decimal(str(self.quantity))
+
+    def __str__(self):
+        return f"{self.patient_card} — {self.medicine.name}"
+
+    class Meta:
+        verbose_name = "Bemor dorisi"
+        verbose_name_plural = "Bemor dorilari"
+        ordering = ['-ordered_at']

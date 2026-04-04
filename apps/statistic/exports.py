@@ -670,6 +670,70 @@ def export_excel(request):
         ws6.cell(row=3, column=1,
                  value="Tashkilotga biriktirilgan bemorlar yo'q").border = border
 
+    # ==================== DORI SHEETI ====================
+    from apps.services.models import PatientMedicine
+    from django.db.models import Sum as MSum
+
+    ws_med = wb.create_sheet("Dori-darmonlar")
+    ws_med.column_dimensions['A'].width = 5
+    ws_med.column_dimensions['B'].width = 40
+    ws_med.column_dimensions['C'].width = 12
+    ws_med.column_dimensions['D'].width = 12
+    ws_med.column_dimensions['E'].width = 15
+    ws_med.column_dimensions['F'].width = 20
+
+    ws_med.merge_cells('A1:F1')
+    c = ws_med.cell(row=1, column=1, value="DORI-DARMON STATISTIKASI")
+    c.fill = header_fill; c.font = header_font
+    c.alignment = center; c.border = border
+    ws_med.row_dimensions[1].height = 28
+
+    heads = ['№', 'Dori nomi', 'Birlik', 'Jami miqdor', 'Bemorlar soni', "Jami summa (so'm)"]
+    for col, h in enumerate(heads, 1):
+        c = ws_med.cell(row=2, column=col, value=h)
+        c.fill = header_fill; c.font = header_font
+        c.alignment = center; c.border = border
+    ws_med.row_dimensions[2].height = 24
+
+    top_meds = (
+        PatientMedicine.objects
+        .filter(patient_card__in=qs)
+        .values('medicine__name', 'medicine__unit')
+        .annotate(total_qty=MSum('quantity'), total_sum=MSum('price'), cnt=Count('patient_card', distinct=True))
+        .order_by('-total_sum')
+    )
+
+    med_grand = 0
+    for ri, m in enumerate(top_meds, 1):
+        row_data = [
+            ri,
+            m['medicine__name'],
+            m['medicine__unit'],
+            float(m['total_qty'] or 0),
+            m['cnt'],
+            float(m['total_sum'] or 0),
+        ]
+        med_grand += float(m['total_sum'] or 0)
+        for col, val in enumerate(row_data, 1):
+            c = ws_med.cell(row=ri+2, column=col, value=val)
+            c.alignment = Alignment(horizontal='center' if col in (1,3,4,5) else ('right' if col==6 else 'left'), vertical='center')
+            c.border = border
+            if col == 6: c.number_format = '#,##0'
+            if ri % 2 == 0: c.fill = PatternFill('solid', fgColor='F8F9FA')
+        ws_med.row_dimensions[ri+2].height = 18
+
+    # Jami qator
+    last_r = len(list(top_meds)) + 3
+    ws_med.merge_cells(start_row=last_r, start_column=1, end_row=last_r, end_column=5)
+    c = ws_med.cell(row=last_r, column=1, value="JAMI:")
+    c.fill = header_fill; c.font = header_font; c.border = border
+    c6 = ws_med.cell(row=last_r, column=6, value=med_grand)
+    c6.fill = header_fill; c6.font = header_font
+    c6.number_format = '#,##0'
+    c6.alignment = Alignment(horizontal='right', vertical='center')
+    c6.border = border
+    ws_med.row_dimensions[last_r].height = 24
+
     # ==================== JAVOB ====================
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

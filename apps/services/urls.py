@@ -16,6 +16,16 @@ urlpatterns = [
     # Statistika
     path('statistics/', views.service_statistics, name='service_statistics'),
 
+    # Dori-darmon
+    path('medicine/search/', views.medicine_search, name='medicine_search'),
+    path('patient/<int:patient_pk>/medicine/add/', views.add_medicine, name='add_medicine'),
+    path('medicine/<int:pk>/update/', views.update_medicine, name='update_medicine'),
+    path('medicine/<int:pk>/delete/', views.delete_medicine, name='delete_medicine'),
+
+    # Dori statistikasi
+    path('medicine/statistics/', views.medicine_statistics, name='medicine_statistics'),
+    path('medicine/export/excel/', views.export_medicine_excel, name='export_medicine_excel'),
+
     # Export
     path('export/excel/', views.export_services_excel, name='export_services_excel'),
     path('export/pdf/', views.export_services_pdf, name='export_services_pdf'),

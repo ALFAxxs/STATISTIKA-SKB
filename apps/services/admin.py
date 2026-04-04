@@ -44,3 +44,16 @@ class PatientServiceAdmin(admin.ModelAdmin):
     def total_price_display(self, obj):
         return f"{obj.total_price:,.0f} so'm"
     total_price_display.short_description = "Jami narx"
+from .models import Medicine, PatientMedicine
+
+@admin.register(Medicine)
+class MedicineAdmin(admin.ModelAdmin):
+    list_display = ['name', 'unit', 'is_active']
+    list_filter = ['unit', 'is_active']
+    search_fields = ['name']
+
+@admin.register(PatientMedicine)
+class PatientMedicineAdmin(admin.ModelAdmin):
+    list_display = ['patient_card', 'medicine', 'quantity', 'price', 'ordered_by', 'ordered_at']
+    list_filter = ['medicine__unit']
+    search_fields = ['medicine__name', 'patient_card__full_name']
