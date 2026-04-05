@@ -875,3 +875,308 @@ def export_medicine_excel(request):
     response['Content-Disposition'] = 'attachment; filename="dori_statistika.xlsx"'
     wb.save(response)
     return response
+
+
+# ==================== OPERATSIYA STATISTIKASI ====================
+
+@login_required
+def operation_statistics(request):
+    """Operatsiya turlari bo'yicha statistika"""
+    from apps.patients.models import SurgicalOperation, OperationType
+    from django.db.models import Count, Q
+    import json
+
+    date_from    = request.GET.get('date_from', '')
+    date_to      = request.GET.get('date_to', '')
+    op_type_id   = request.GET.get('op_type', '')
+    anesthesia   = request.GET.get('anesthesia', '')
+
+    qs = SurgicalOperation.objects.select_related(
+        'operation_type', 'patient_card'
+    ).filter(operation_type__isnull=False)
+
+    if date_from:
+        qs = qs.filter(operation_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(operation_date__lte=date_to)
+    if op_type_id:
+        qs = qs.filter(operation_type_id=op_type_id)
+    if anesthesia:
+        qs = qs.filter(anesthesia=anesthesia)
+
+    # Har bir operatsiya turi bo'yicha statistika
+    op_stats = (
+        qs.values(
+            'operation_type__id',
+            'operation_type__code',
+            'operation_type__name',
+        )
+        .annotate(
+            total_count=Count('id'),
+            # Bemor kategoriyasi bo'yicha
+            railway_count=Count('id', filter=Q(patient_card__patient_category='railway')),
+            paid_count=Count('id', filter=Q(patient_card__patient_category='paid')),
+            nonresident_count=Count('id', filter=Q(patient_card__patient_category='non_resident')),
+            # Narkoz bo'yicha
+            anesthesia_yes=Count('id', filter=Q(anesthesia='yes')),
+            anesthesia_no=Count('id', filter=Q(anesthesia='no')),
+            anesthesia_local=Count('id', filter=Q(anesthesia='local')),
+        )
+        .order_by('-total_count')
+    )
+
+    # Xizmat narxlari bilan bog'lash (agar Service da OperationType bog'liq bo'lsa)
+    # SurgicalOperation da narx yo'q - faqat PatientService orqali olish mumkin
+    # Shu sababli PatientService orqali operatsiya xizmatlarini topamiz
+    from apps.services.models import PatientService
+    from django.db.models import Sum
+
+    # Operatsiya xizmatlari summasi (service kategoriyasi 'surgery' bo'lganlar)
+    svc_totals_by_cat = {}
+    surgery_svcs = (
+        PatientService.objects
+        .filter(service__category__category_type='surgery')
+        .values('patient_card__patient_category')
+        .annotate(total=Sum('price'), cnt=Count('id'))
+    )
+    for s in surgery_svcs:
+        cat = s['patient_card__patient_category']
+        svc_totals_by_cat[cat] = {
+            'total': float(s['total'] or 0),
+            'count': s['cnt']
+        }
+
+    # Umumiy ko'rsatkichlar
+    totals = qs.aggregate(
+        total=Count('id'),
+        railway=Count('id', filter=Q(patient_card__patient_category='railway')),
+        paid=Count('id', filter=Q(patient_card__patient_category='paid')),
+        nonresident=Count('id', filter=Q(patient_card__patient_category='non_resident')),
+        with_anesthesia=Count('id', filter=Q(anesthesia='yes')),
+        local_anesthesia=Count('id', filter=Q(anesthesia='local')),
+        no_anesthesia=Count('id', filter=Q(anesthesia='no')),
+    )
+
+    # Trend (oylik)
+    from django.db.models.functions import TruncMonth
+    trend = (
+        qs.annotate(month=TruncMonth('operation_date'))
+        .values('month')
+        .annotate(cnt=Count('id'))
+        .order_by('month')
+    )
+    trend_labels = [t['month'].strftime('%Y-%m') for t in trend if t['month']]
+    trend_values = [t['cnt'] for t in trend if t['month']]
+
+    op_types_list = OperationType.objects.filter(is_active=True).order_by('name')
+    current_filters = request.GET.urlencode()
+
+    return render(request, 'services/operation_statistics.html', {
+        'op_stats': op_stats,
+        'totals': totals,
+        'svc_totals_by_cat': svc_totals_by_cat,
+        'trend_labels': json.dumps(trend_labels),
+        'trend_values': json.dumps(trend_values),
+        'op_types_list': op_types_list,
+        'date_from': date_from,
+        'date_to': date_to,
+        'selected_op_type': op_type_id,
+        'selected_anesthesia': anesthesia,
+        'current_filters': current_filters,
+    })
+
+
+@login_required
+def export_operation_excel(request):
+    """Operatsiya statistikasi Excel export"""
+    from apps.patients.models import SurgicalOperation
+    from django.db.models import Count, Sum, Q
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    date_from  = request.GET.get('date_from', '')
+    date_to    = request.GET.get('date_to', '')
+    op_type_id = request.GET.get('op_type', '')
+    anesthesia = request.GET.get('anesthesia', '')
+
+    qs = SurgicalOperation.objects.select_related(
+        'operation_type', 'patient_card'
+    ).filter(operation_type__isnull=False)
+
+    if date_from:    qs = qs.filter(operation_date__gte=date_from)
+    if date_to:      qs = qs.filter(operation_date__lte=date_to)
+    if op_type_id:   qs = qs.filter(operation_type_id=op_type_id)
+    if anesthesia:   qs = qs.filter(anesthesia=anesthesia)
+
+    # Stillar
+    BLUE  = PatternFill('solid', fgColor='1F4E79')
+    LBLUE = PatternFill('solid', fgColor='D6E4F0')
+    GREEN = PatternFill('solid', fgColor='E9F7EF')
+    YELL  = PatternFill('solid', fgColor='FFF3CD')
+    RED   = PatternFill('solid', fgColor='FDEDEC')
+    WHITE = PatternFill('solid', fgColor='FFFFFF')
+    TOTAL = PatternFill('solid', fgColor='145A32')
+
+    WF   = Font(color='FFFFFF', bold=True, size=10)
+    BOLD = Font(bold=True, size=10)
+    NORM = Font(size=9)
+    C    = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    L    = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+    R    = Alignment(horizontal='right',  vertical='center')
+    brd  = Side(style='thin', color='CCCCCC')
+    BRD  = Border(left=brd, right=brd, top=brd, bottom=brd)
+
+    wb = openpyxl.Workbook()
+
+    # ===== SHEET 1: OPERATSIYA TURI BO'YICHA =====
+    ws1 = wb.active
+    ws1.title = "Operatsiya turlari"
+
+    col_w = [5, 12, 35, 12, 12, 14, 16, 14, 14, 12, 12]
+    for ci, w in enumerate(col_w, 1):
+        from openpyxl.utils import get_column_letter
+        ws1.column_dimensions[get_column_letter(ci)].width = w
+
+    ws1.merge_cells('A1:K1')
+    c = ws1.cell(row=1, column=1, value="OPERATSIYA TURLARI BO'YICHA STATISTIKA")
+    c.fill = BLUE; c.font = Font(color='FFFFFF', bold=True, size=13)
+    c.alignment = C
+    ws1.row_dimensions[1].height = 30
+
+    if date_from or date_to:
+        ws1.merge_cells('A2:K2')
+        c = ws1.cell(row=2, column=1,
+            value=f"Davr: {date_from or '—'} dan {date_to or '—'} gacha")
+        c.font = BOLD; c.alignment = C
+        ws1.row_dimensions[2].height = 18
+        hdr_row = 3
+    else:
+        hdr_row = 2
+
+    headers = [
+        '№', 'Kod', 'Operatsiya nomi',
+        'Jami\nsoni',
+        "Temir\nyo'lchi",
+        'Pullik',
+        'Norezident',
+        "Narkoz\nbilan",
+        'Mahalliy\nnarkoz',
+        'Narkozsiz',
+        'Asorat\nbor',
+    ]
+    for col, h in enumerate(headers, 1):
+        c = ws1.cell(row=hdr_row, column=col, value=h)
+        c.fill = BLUE; c.font = WF; c.alignment = C; c.border = BRD
+    ws1.row_dimensions[hdr_row].height = 36
+
+    op_stats = (
+        qs.values(
+            'operation_type__id',
+            'operation_type__code',
+            'operation_type__name',
+        )
+        .annotate(
+            total_count=Count('id'),
+            railway=Count('id', filter=Q(patient_card__patient_category='railway')),
+            paid=Count('id', filter=Q(patient_card__patient_category='paid')),
+            nonresident=Count('id', filter=Q(patient_card__patient_category='non_resident')),
+            anes_yes=Count('id', filter=Q(anesthesia='yes')),
+            anes_local=Count('id', filter=Q(anesthesia='local')),
+            anes_no=Count('id', filter=Q(anesthesia='no')),
+            has_complication=Count('id', filter=~Q(complication='') & Q(complication__isnull=False)),
+        )
+        .order_by('-total_count')
+    )
+
+    totals_row = [0] * 9
+    dr = hdr_row + 1
+    for ri, op in enumerate(op_stats, 1):
+        vals = [
+            ri,
+            op['operation_type__code'] or '—',
+            op['operation_type__name'],
+            op['total_count'],
+            op['railway'],
+            op['paid'],
+            op['nonresident'],
+            op['anes_yes'],
+            op['anes_local'],
+            op['anes_no'],
+            op['has_complication'],
+        ]
+        for j in range(3, 11): totals_row[j-3] += vals[j] if j < len(vals) else 0
+        for col, val in enumerate(vals, 1):
+            c = ws1.cell(row=dr, column=col, value=val)
+            c.font = NORM; c.border = BRD
+            c.alignment = C if col != 3 else L
+            fill = [LBLUE, YELL, WHITE, RED][ri % 4] if col > 3 else WHITE
+            if ri % 2 == 0: c.fill = PatternFill('solid', fgColor='F0F6FC')
+        ws1.row_dimensions[dr].height = 18
+        dr += 1
+
+    # Jami
+    tot_vals = ['', '', 'JAMI:'] + [qs.aggregate(t=Count('id'))['t']] + [
+        qs.filter(patient_card__patient_category='railway').count(),
+        qs.filter(patient_card__patient_category='paid').count(),
+        qs.filter(patient_card__patient_category='non_resident').count(),
+        qs.filter(anesthesia='yes').count(),
+        qs.filter(anesthesia='local').count(),
+        qs.filter(anesthesia='no').count(),
+        qs.exclude(complication='').exclude(complication__isnull=True).count(),
+    ]
+    for col, val in enumerate(tot_vals, 1):
+        c = ws1.cell(row=dr, column=col, value=val)
+        c.fill = BLUE; c.font = WF; c.alignment = C if col != 3 else L; c.border = BRD
+    ws1.row_dimensions[dr].height = 22
+
+    # ===== SHEET 2: BATAFSIL RO'YXAT =====
+    ws2 = wb.create_sheet("Batafsil ro'yxat")
+    h2_widths = [5, 14, 28, 14, 35, 20, 16, 14, 30]
+    for ci, w in enumerate(h2_widths, 1):
+        from openpyxl.utils import get_column_letter
+        ws2.column_dimensions[get_column_letter(ci)].width = w
+
+    ws2.merge_cells('A1:I1')
+    c = ws2.cell(row=1, column=1, value="OPERATSIYALAR BATAFSIL RO'YXATI")
+    c.fill = BLUE; c.font = Font(color='FFFFFF', bold=True, size=12); c.alignment = C
+    ws2.row_dimensions[1].height = 26
+
+    h2 = ['№', 'Sana', 'Bemor', 'Bayonnoma', 'Operatsiya turi', 'Bemor turi', 'Narkoz', "Asorat bor?", 'Asorat tavsifi']
+    for col, h in enumerate(h2, 1):
+        c = ws2.cell(row=2, column=col, value=h)
+        c.fill = BLUE; c.font = WF; c.alignment = C; c.border = BRD
+    ws2.row_dimensions[2].height = 22
+
+    for ri, op in enumerate(qs.order_by('-operation_date'), 1):
+        cat_display = {
+            'railway': "Temir yo'lchi",
+            'paid': 'Pullik',
+            'non_resident': 'Norezident',
+        }.get(op.patient_card.patient_category, '—')
+
+        has_comp = bool(op.complication and op.complication.strip())
+        data = [
+            ri,
+            op.operation_date.strftime('%d.%m.%Y') if op.operation_date else '—',
+            op.patient_card.full_name,
+            op.patient_card.medical_record_number,
+            str(op.operation_type) if op.operation_type else op.operation_name or '—',
+            cat_display,
+            op.get_anesthesia_display() if op.anesthesia else '—',
+            'Ha' if has_comp else "Yo'q",
+            op.complication or '—',
+        ]
+        for col, val in enumerate(data, 1):
+            c = ws2.cell(row=ri+2, column=col, value=val)
+            c.font = NORM; c.border = BRD
+            c.alignment = C if col in (1,2,4,6,7,8) else L
+            if ri % 2 == 0: c.fill = PatternFill('solid', fgColor='F0F6FC')
+            if col == 8 and has_comp: c.fill = PatternFill('solid', fgColor='FDEDEC')
+        ws2.row_dimensions[ri+2].height = 17
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="operatsiya_statistika.xlsx"'
+    wb.save(response)
+    return response

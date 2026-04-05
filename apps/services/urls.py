@@ -26,6 +26,10 @@ urlpatterns = [
     path('medicine/statistics/', views.medicine_statistics, name='medicine_statistics'),
     path('medicine/export/excel/', views.export_medicine_excel, name='export_medicine_excel'),
 
+    # Operatsiya statistikasi
+    path('operations/statistics/', views.operation_statistics, name='operation_statistics'),
+    path('operations/export/excel/', views.export_operation_excel, name='export_operation_excel'),
+
     # Export
     path('export/excel/', views.export_services_excel, name='export_services_excel'),
     path('export/pdf/', views.export_services_pdf, name='export_services_pdf'),

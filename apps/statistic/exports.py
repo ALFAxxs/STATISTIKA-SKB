@@ -281,257 +281,349 @@ def export_excel(request):
     from apps.services.models import PatientService
     from django.db.models import Sum, Count
 
-    ws4 = wb.create_sheet("Bemorlar xizmatlari")
-    ws4.column_dimensions['A'].width = 6
-    ws4.column_dimensions['B'].width = 28
-    ws4.column_dimensions['C'].width = 16
-    ws4.column_dimensions['D'].width = 30
-    ws4.column_dimensions['E'].width = 22
-    ws4.column_dimensions['F'].width = 18
-    ws4.column_dimensions['G'].width = 18
+    # ==================== 4-SAHIFA: BEMORLAR XIZMATLARI ====================
+    from apps.services.models import PatientService, PatientMedicine
+    from django.db.models import Sum, Count
 
-    # Sarlavha
-    ws4.merge_cells('A1:G1')
-    c = ws4.cell(row=1, column=1, value="BEMORLAR VA XIZMATLAR HISOBOTI")
-    c.fill = header_fill; c.font = header_font
-    c.alignment = center; c.border = border
+    ws4 = wb.create_sheet("Bemorlar xizmatlari")
+
+    # Ustun sarlavhalari — bemor ma'lumotlari + xizmatlar + dorilar
+    BEM_HEADS = [
+        '№', 'F.I.Sh', 'Qabul sanasi va vaqt', "Tug'ilgan sana",
+        'Passport', 'JSHSHIR', 'Yashash manzili', 'Lavozimi', 'Ish joyi',
+        'Qabulxona tashxisi', "Bo'lim", 'Bemor turi',
+        'Yotoq kun', 'Yil boshidan', 'Jami tashriflar',
+        'Xizmat turi', "Xizmat summasi (so'm)",
+        'Dori nomi', "Dori summasi (so'm)",
+    ]
+
+    # Ustun kengliklari
+    col_widths_4 = [5, 28, 18, 14, 14, 16, 30, 18, 28, 30, 20, 14, 10, 12, 14, 25, 18, 25, 18]
+    for ci, w in enumerate(col_widths_4, 1):
+        ws4.column_dimensions[get_column_letter(ci)].width = w
+
+    ws4.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(BEM_HEADS))
+    c = ws4.cell(row=1, column=1, value="BEMORLAR XIZMATLARI VA DORI-DARMONLAR HISOBOTI")
+    c.fill = header_fill; c.font = header_font; c.alignment = center; c.border = border
     ws4.row_dimensions[1].height = 28
 
-    # Ustun sarlavhalari
-    h4 = ['№', 'Bemor', 'Bayonnoma', "Bo'lim", 'Kategoriya', 'Xizmat turi', "Summa (so'm)"]
-    for col, h in enumerate(h4, 1):
+    for col, h in enumerate(BEM_HEADS, 1):
         c = ws4.cell(row=2, column=col, value=h)
-        c.fill = header_fill; c.font = header_font
-        c.alignment = center; c.border = border
-    ws4.row_dimensions[2].height = 22
+        c.fill = header_fill; c.font = header_font; c.alignment = center; c.border = border
+    ws4.row_dimensions[2].height = 30
 
     r4 = 3
     patient_num = 0
+    grand_svc_total = 0
+    grand_med_total = 0
+    grand_total_4   = 0
+
+    from django.db.models import Q
+    from datetime import date
+
+    year_start = date(date.today().year, 1, 1)
 
     for patient in qs:
-        patient_services = PatientService.objects.filter(
+        p_svcs  = PatientService.objects.filter(
             patient_card=patient
-        ).select_related('service__category')
+        ).select_related('service__category').order_by('service__category__name')
+        p_meds  = PatientMedicine.objects.filter(
+            patient_card=patient
+        ).select_related('medicine').order_by('medicine__name')
 
-        if not patient_services.exists():
+        has_svc = p_svcs.exists()
+        has_med = p_meds.exists()
+        if not has_svc and not has_med:
             continue
 
         patient_num += 1
 
-        # Kategoriya bo'yicha guruhlash
-        cat_stats = patient_services.values(
-            'service__category__name'
-        ).annotate(
-            count=Count('id'),
-            total=Sum('price'),
-        ).order_by('service__category__name')
+        # Bemor umumiy ma'lumotlari
+        address_parts = [
+            str(patient.country) if patient.country else '',
+            str(patient.region)  if patient.region  else '',
+            str(patient.district)if patient.district else '',
+            str(patient.city)    if patient.city     else '',
+            patient.street_address or '',
+        ]
+        address = ', '.join(p for p in address_parts if p) or '—'
 
-        patient_total = patient_services.aggregate(t=Sum('price'))['t'] or 0
-        cat_count = cat_stats.count()
-        start_row = r4
+        workplace = ''
+        if patient.workplace_org:
+            workplace = str(patient.workplace_org)
+        elif patient.workplace:
+            workplace = patient.workplace
 
-        # Har bir kategoriya qatori
-        for i, cat in enumerate(cat_stats):
-            if i == 0:
-                # Birinchi qatorda bemor ma'lumotlari
-                ws4.cell(row=r4, column=1, value=patient_num).border = border
-                ws4.cell(row=r4, column=2, value=patient.full_name).border = border
-                ws4.cell(row=r4, column=3, value=patient.medical_record_number).border = border
-                ws4.cell(row=r4, column=4,
-                         value=str(patient.department) if patient.department else '—').border = border
-                ws4.cell(row=r4, column=5,
-                         value=patient.get_patient_category_display()).border = border
+        # Tashriflar soni
+        from apps.patients.models import PatientCard as PC
+        visits_year  = PC.objects.filter(
+            full_name=patient.full_name,
+            admission_date__date__gte=year_start
+        ).count() if patient.full_name else 0
+        visits_total = PC.objects.filter(
+            full_name=patient.full_name
+        ).count() if patient.full_name else 0
+        if patient.JSHSHIR:
+            visits_year  = PC.objects.filter(JSHSHIR=patient.JSHSHIR, admission_date__date__gte=year_start).count()
+            visits_total = PC.objects.filter(JSHSHIR=patient.JSHSHIR).count()
+
+        # Xizmatlar kategoriya bo'yicha
+        cat_groups = {}
+        for svc in p_svcs:
+            cat = svc.service.category.name
+            cat_groups.setdefault(cat, 0)
+            cat_groups[cat] += float(svc.price * svc.quantity)
+
+        # Dori-darmonlar
+        med_groups = {}
+        for med in p_meds:
+            name = med.medicine.name
+            med_groups.setdefault(name, 0)
+            med_groups[name] += float(med.total_price)
+
+        # Nechta qator kerak
+        max_rows = max(len(cat_groups) if cat_groups else 1,
+                       len(med_groups) if med_groups else 1)
+
+        svc_items = list(cat_groups.items())
+        med_items = list(med_groups.items())
+
+        # Har bir qator
+        for ri in range(max_rows):
+            row_num_in_patient = ri
+
+            # Bemor info — faqat birinchi qatorda
+            if ri == 0:
+                bem_data = [
+                    patient_num,
+                    patient.full_name,
+                    patient.admission_date.strftime('%d.%m.%Y %H:%M') if patient.admission_date else '—',
+                    patient.birth_date.strftime('%d.%m.%Y') if patient.birth_date else '—',
+                    patient.passport_serial or '—',
+                    patient.JSHSHIR or '—',
+                    address,
+                    patient.position or '—',
+                    workplace or '—',
+                    patient.admission_diagnosis or '—',
+                    str(patient.department) if patient.department else '—',
+                    patient.get_patient_category_display(),
+                    patient.days_in_hospital or 0,
+                    visits_year,
+                    visits_total,
+                ]
             else:
-                for col in range(1, 6):
-                    ws4.cell(row=r4, column=col, value='').border = border
+                bem_data = [''] * 15
 
-            # Kategoriya nomi
-            c = ws4.cell(row=r4, column=6, value=cat['service__category__name'])
-            c.fill = PatternFill('solid', fgColor='EBF5FB')
-            c.font = Font(size=10); c.border = border
+            # Xizmat
+            if ri < len(svc_items):
+                cat_name, cat_sum = svc_items[ri]
+                bem_data += [cat_name, cat_sum]
+            else:
+                bem_data += ['', '']
 
-            # Kategoriya summa
-            c7 = ws4.cell(row=r4, column=7, value=float(cat['total'] or 0))
-            c7.fill = PatternFill('solid', fgColor='EBF5FB')
-            c7.font = Font(size=10)
-            c7.number_format = '#,##0'
-            c7.alignment = Alignment(horizontal='right', vertical='center')
-            c7.border = border
+            # Dori
+            if ri < len(med_items):
+                med_name, med_sum = med_items[ri]
+                bem_data += [med_name, med_sum]
+            else:
+                bem_data += ['', '']
+
+            for col, val in enumerate(bem_data, 1):
+                c = ws4.cell(row=r4, column=col, value=val)
+                c.border = border
+                c.font = Font(size=9)
+                c.alignment = Alignment(
+                    horizontal='center' if col in (1,3,4,13,14,15) else 'left',
+                    vertical='center', wrap_text=True
+                )
+                if col in (17, 19): c.number_format = '#,##0'
+                if ri % 2 == 0:
+                    c.fill = PatternFill('solid', fgColor='F8F9FA')
 
             ws4.row_dimensions[r4].height = 18
             r4 += 1
 
-        # Bemorning 1-5 ustunlarini birlashtirish
-        if cat_count > 1:
-            for col in range(1, 6):
-                ws4.merge_cells(
-                    start_row=start_row, start_column=col,
-                    end_row=r4 - 1, end_column=col
-                )
-                c = ws4.cell(row=start_row, column=col)
-                c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        # Bemor jami qatori
+        svc_total  = sum(v for _, v in svc_items)
+        med_total_ = sum(v for _, v in med_items)
+        bem_jami   = svc_total + med_total_
 
-        # Bemor jami
-        ws4.merge_cells(start_row=r4, start_column=1, end_row=r4, end_column=6)
-        c = ws4.cell(row=r4, column=1,
-                     value=f"   {patient.full_name} — jami:")
-        c.fill = PatternFill('solid', fgColor='D6E4F0')
-        c.font = Font(bold=True, size=10)
-        c.border = border
+        # Jami qatorni birlashtirish (1-15 ustunlar)
+        if max_rows > 1:
+            ws4.merge_cells(
+                start_row=r4 - max_rows, start_column=1,
+                end_row=r4 - 1, end_column=1
+            )
 
-        c7 = ws4.cell(row=r4, column=7, value=float(patient_total))
-        c7.fill = PatternFill('solid', fgColor='D6E4F0')
-        c7.font = Font(bold=True, size=10)
-        c7.number_format = '#,##0'
-        c7.alignment = Alignment(horizontal='right', vertical='center')
-        c7.border = border
-        ws4.row_dimensions[r4].height = 20
+        jami_row_data = [''] * 15 + ['Xizmatlar jami:', svc_total, 'Dorilar jami:', med_total_]
+        for col, val in enumerate(jami_row_data, 1):
+            c = ws4.cell(row=r4, column=col, value=val)
+            c.border = border
+            c.font = Font(size=9, bold=True)
+            c.fill = PatternFill('solid', fgColor='D6E4F0')
+            c.alignment = Alignment(horizontal='right' if col in (16,18) else 'center', vertical='center')
+            if col in (17, 19): c.number_format = '#,##0'
+        # Bemor umumiy jami (19-ustundan keyin alohida)
+        ws4.cell(row=r4, column=1).value = "Bemor jami: {:,.0f} so'm".format(bem_jami)
+        ws4.cell(row=r4, column=1).font = Font(size=9, bold=True)
+        ws4.cell(row=r4, column=1).fill = PatternFill('solid', fgColor='D6E4F0')
+        ws4.merge_cells(start_row=r4, start_column=1, end_row=r4, end_column=15)
+        ws4.row_dimensions[r4].height = 18
         r4 += 1
 
-    # Umumiy jami
-    all_total = PatientService.objects.filter(
-        patient_card__in=qs
-    ).aggregate(t=Sum('price'))['t'] or 0
+        # Umumiy jami uchun yig'amiz
+        grand_svc_total  += svc_total
+        grand_med_total  += med_total_
+        grand_total_4    += bem_jami
 
-    ws4.merge_cells(start_row=r4, start_column=1, end_row=r4, end_column=6)
-    c = ws4.cell(row=r4, column=1, value="UMUMIY JAMI:")
-    c.fill = header_fill; c.font = header_font; c.border = border
-    c7 = ws4.cell(row=r4, column=7, value=float(all_total))
-    c7.fill = header_fill; c7.font = header_font
-    c7.number_format = '#,##0'
-    c7.alignment = Alignment(horizontal='right', vertical='center')
-    c7.border = border
-    ws4.row_dimensions[r4].height = 25
+    # Barcha bemorlar umumiy jami
+    ws4.merge_cells(start_row=r4, start_column=1, end_row=r4, end_column=15)
+    c = ws4.cell(row=r4, column=1, value="BARCHA BEMORLAR UMUMIY JAMI: {:,.0f} so'm".format(grand_total_4))
+    c.fill = header_fill; c.font = header_font
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = border
+    ws4.cell(row=r4, column=16, value="Xizmatlar jami:").border = border
+    c17 = ws4.cell(row=r4, column=17, value=grand_svc_total)
+    c17.fill = header_fill; c17.font = header_font
+    c17.number_format = '#,##0'; c17.border = border
+    ws4.cell(row=r4, column=18, value="Dorilar jami:").border = border
+    c19 = ws4.cell(row=r4, column=19, value=grand_med_total)
+    c19.fill = header_fill; c19.font = header_font
+    c19.number_format = '#,##0'; c19.border = border
+    ws4.row_dimensions[r4].height = 24
 
-    if patient_num == 0:
-        ws4.merge_cells('A3:G3')
-        ws4.cell(row=3, column=1, value="Xizmatlar mavjud emas").border = border
-
-
-    # ==================== 5-SAHIFA: BIRLASHGAN JADVAL ====================
-    from apps.services.models import PatientService, ServiceCategory
-    from django.db.models import Sum
+    # ==================== 5-SAHIFA: BEMOR + XIZMATLAR ====================
+    from apps.services.models import ServiceCategory
 
     ws5 = wb.create_sheet("Bemor + Xizmatlar")
 
-    # Barcha kategoriyalarni olish
     all_cats = list(ServiceCategory.objects.filter(is_active=True).order_by('name'))
     cat_names = [c.name for c in all_cats]
 
+    # Ustunlar: bemor ma'lumotlari + kategoriyalar + dorilar jami + JAMI
+    FIXED = [
+        '№', 'F.I.Sh', 'Qabul sanasi', "Tug'ilgan sana",
+        'Passport', 'JSHSHIR', 'Yashash manzili', 'Lavozimi', 'Ish joyi',
+        'Qabulxona tashxisi', "Bo'lim", 'Bemor turi',
+        'Yotoq kun', 'Yil boshidan', 'Jami tashriflar',
+    ]
+    all_headers = FIXED + cat_names + ["Dori-darmonlar (so'm)", "JAMI (so'm)"]
+    total_cols5 = len(all_headers)
+
     # Ustun kengliklari
-    fixed_cols = ['№', 'Bemor', 'Bayonnoma', "Bo'lim", 'Kategoriya', 'Qabul sanasi']
-    all_headers = fixed_cols + cat_names + ["JAMI (so'm)"]
-
+    fixed_widths = [5, 28, 16, 14, 14, 16, 28, 16, 25, 28, 18, 14, 10, 12, 14]
     ws5.column_dimensions['A'].width = 5
-    ws5.column_dimensions['B'].width = 28
-    ws5.column_dimensions['C'].width = 16
-    ws5.column_dimensions['D'].width = 20
-    ws5.column_dimensions['E'].width = 16
-    ws5.column_dimensions['F'].width = 14
-    for i in range(len(cat_names)):
-        ws5.column_dimensions[get_column_letter(7 + i)].width = 16
-    ws5.column_dimensions[get_column_letter(7 + len(cat_names))].width = 18
+    for ci, w in enumerate(fixed_widths, 1):
+        ws5.column_dimensions[get_column_letter(ci)].width = w
+    for ci in range(len(FIXED)+1, len(FIXED)+len(cat_names)+1):
+        ws5.column_dimensions[get_column_letter(ci)].width = 16
+    ws5.column_dimensions[get_column_letter(len(all_headers)-1)].width = 18
+    ws5.column_dimensions[get_column_letter(len(all_headers))].width = 18
 
-    # 1-qator: sarlavha
-    total_cols = len(all_headers)
-    ws5.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    c = ws5.cell(row=1, column=1, value="BEMORLAR VA XIZMATLAR — BIRLASHGAN JADVAL")
-    c.fill = header_fill; c.font = header_font
-    c.alignment = center; c.border = border
+    ws5.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols5)
+    c = ws5.cell(row=1, column=1, value="BEMORLAR VA XIZMATLAR — KENGAYTIRILGAN JADVAL")
+    c.fill = header_fill; c.font = header_font; c.alignment = center; c.border = border
     ws5.row_dimensions[1].height = 28
 
-    # 2-qator: ustun sarlavhalari
     for col, h in enumerate(all_headers, 1):
         c = ws5.cell(row=2, column=col, value=h)
-        c.fill = header_fill; c.font = header_font
-        c.alignment = center; c.border = border
+        c.fill = header_fill; c.font = header_font; c.alignment = center; c.border = border
     ws5.row_dimensions[2].height = 35
 
-    # Ma'lumotlar
     r5 = 3
     col_grand_totals = {name: 0 for name in cat_names}
-    overall_total = 0
+    overall_total5   = 0
+    med_grand_total  = 0
 
     for num, patient in enumerate(qs, 1):
-        # Bemor xizmatlari kategoriya bo'yicha
+        # Xizmatlar
         svc_by_cat = {}
-        patient_svcs = PatientService.objects.filter(
-            patient_card=patient
-        ).values('service__category__name').annotate(total=Sum('price'))
-
-        for row in patient_svcs:
+        for row in PatientService.objects.filter(patient_card=patient).values(
+            'service__category__name'
+        ).annotate(total=Sum('price')):
             svc_by_cat[row['service__category__name']] = float(row['total'] or 0)
 
-        patient_total = sum(svc_by_cat.values())
-        overall_total += patient_total
+        # Dorilar jami
+        med_total = float(
+            PatientMedicine.objects.filter(patient_card=patient)
+            .aggregate(t=Sum('price'))[ 't'] or 0
+        )
 
-        # Qator ma'lumotlari
+        patient_svc_total = sum(svc_by_cat.values())
+        patient_total     = patient_svc_total + med_total
+        overall_total5   += patient_total
+        med_grand_total  += med_total
+
+        # Bemor ma'lumotlari
+        address_parts = [
+            str(patient.country) if patient.country else '',
+            str(patient.region)  if patient.region  else '',
+            str(patient.district)if patient.district else '',
+            str(patient.city)    if patient.city     else '',
+            patient.street_address or '',
+        ]
+        address = ', '.join(p for p in address_parts if p) or '—'
+        workplace = str(patient.workplace_org) if patient.workplace_org else (patient.workplace or '—')
+
+        if patient.JSHSHIR:
+            vis_year  = PatientCard.objects.filter(JSHSHIR=patient.JSHSHIR, admission_date__date__gte=year_start).count()
+            vis_total = PatientCard.objects.filter(JSHSHIR=patient.JSHSHIR).count()
+        else:
+            vis_year = vis_total = 1
+
         row_data = [
             num,
             patient.full_name,
-            patient.medical_record_number,
+            patient.admission_date.strftime('%d.%m.%Y') if patient.admission_date else '—',
+            patient.birth_date.strftime('%d.%m.%Y') if patient.birth_date else '—',
+            patient.passport_serial or '—',
+            patient.JSHSHIR or '—',
+            address,
+            patient.position or '—',
+            workplace,
+            patient.admission_diagnosis or '—',
             str(patient.department) if patient.department else '—',
             patient.get_patient_category_display(),
-            patient.admission_date.strftime('%d.%m.%Y') if patient.admission_date else '—',
+            patient.days_in_hospital or 0,
+            vis_year,
+            vis_total,
         ]
 
-        # Har bir kategoriya uchun narx
         for cat_name in cat_names:
             val = svc_by_cat.get(cat_name, 0)
-            row_data.append(val if val else None)
-            col_grand_totals[cat_name] = col_grand_totals.get(cat_name, 0) + (val or 0)
+            row_data.append(val if val else '')
+            col_grand_totals[cat_name] = col_grand_totals.get(cat_name, 0) + val
 
-        row_data.append(patient_total if patient_total else None)
+        row_data.append(med_total if med_total else '')
+        row_data.append(patient_total if patient_total else '')
 
-        # Qatorni yozish
         for col, val in enumerate(row_data, 1):
             c = ws5.cell(row=r5, column=col, value=val)
+            c.border = border
+            c.font = Font(size=9)
             c.alignment = Alignment(
-                horizontal='right' if col > 6 else 'left',
+                horizontal='center' if col in (1,3,4,13,14,15) else 'left',
                 vertical='center', wrap_text=True
             )
-            c.border = border
-            if col > 6 and val:
-                c.number_format = '#,##0'
-                # Xizmat bor kataklar — yashil fon
-                c.fill = PatternFill('solid', fgColor='E9F7EF')
-            if col == total_cols and val:
-                c.font = Font(bold=True, size=10)
-                c.fill = PatternFill('solid', fgColor='D6E4F0')
-
-        # Alternativ qator rangi
-        if num % 2 == 0:
-            for col in range(1, 7):
-                c = ws5.cell(row=r5, column=col)
-                if not c.fill or c.fill.fgColor.rgb == '00000000':
-                    c.fill = PatternFill('solid', fgColor='F8F9FA')
-
+            if col > len(FIXED): c.number_format = '#,##0'
+            if num % 2 == 0: c.fill = PatternFill('solid', fgColor='F8F9FA')
         ws5.row_dimensions[r5].height = 18
         r5 += 1
 
     # Jami qator
-    total_row_data = ['', 'JAMI:', '', '', '', '']
+    jami_row = ['JAMI:'] + [''] * (len(FIXED)-1)
     for cat_name in cat_names:
-        t = col_grand_totals.get(cat_name, 0)
-        total_row_data.append(t if t else None)
-    total_row_data.append(overall_total)
+        jami_row.append(col_grand_totals.get(cat_name, 0))
+    jami_row.append(med_grand_total)
+    jami_row.append(overall_total5)
 
-    for col, val in enumerate(total_row_data, 1):
+    for col, val in enumerate(jami_row, 1):
         c = ws5.cell(row=r5, column=col, value=val)
         c.fill = header_fill; c.font = header_font
+        c.alignment = Alignment(horizontal='center' if col==1 else 'right', vertical='center')
         c.border = border
-        c.alignment = Alignment(
-            horizontal='right' if col > 6 else 'left',
-            vertical='center'
-        )
-        if col > 6 and val:
-            c.number_format = '#,##0'
-    ws5.row_dimensions[r5].height = 25
-
-    if r5 == 3:
-        ws5.merge_cells(start_row=3, start_column=1, end_row=3, end_column=total_cols)
-        ws5.cell(row=3, column=1, value="Bemorlar topilmadi").border = border
-
+        if col > 1 and isinstance(val, (int, float)): c.number_format = '#,##0'
+    ws5.row_dimensions[r5].height = 22
 
     # ==================== 6-SAHIFA: TASHKILOT BO'YICHA ====================
     from apps.patients.models import Organization
