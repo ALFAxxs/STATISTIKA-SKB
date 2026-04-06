@@ -14,7 +14,8 @@ urlpatterns = [
     path('search/', views.service_search, name='service_search'),
 
     # Statistika
-    path('statistics/', views.service_statistics, name='service_statistics'),
+    path('statistics/', views.statistics_combined, name='service_statistics'),
+    path('statistics/old/', views.service_statistics, name='service_statistics_old'),
 
     # Dori-darmon
     path('medicine/search/', views.medicine_search, name='medicine_search'),
@@ -29,6 +30,10 @@ urlpatterns = [
     # Operatsiya statistikasi
     path('operations/statistics/', views.operation_statistics, name='operation_statistics'),
     path('operations/export/excel/', views.export_operation_excel, name='export_operation_excel'),
+
+    # Operatsiya xizmatlari statistikasi
+    path('operations/service-statistics/', views.operation_service_statistics, name='operation_service_statistics'),
+    path('operations/service-statistics/excel/', views.export_operation_service_excel, name='export_operation_service_excel'),
 
     # Export
     path('export/excel/', views.export_services_excel, name='export_services_excel'),

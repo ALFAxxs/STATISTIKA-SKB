@@ -68,6 +68,10 @@ class Service(models.Model):
         verbose_name="Mas'ul bo'lim"
     )
     is_active = models.BooleanField(default=True)
+    is_operation = models.BooleanField(
+        default=False,
+        verbose_name="Operatsiyami?"
+    )
 
     def price_for_patient(self, patient_category):
         """Bemor kategoriyasiga qarab narx hisoblash"""

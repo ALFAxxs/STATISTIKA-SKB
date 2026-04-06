@@ -475,6 +475,11 @@ def patient_list(request):
     if dept_filter and (request.user.is_superuser or request.user.role == 'admin'):
         qs = qs.filter(department_id=dept_filter)
 
+    # Visit type filteri (ambulator/statsionar)
+    visit_type = request.GET.get('visit_type', '')
+    if visit_type:
+        qs = qs.filter(visit_type=visit_type)
+
     # Shifokor filteri
     doctor_filter = request.GET.get('doctor', '')
     if doctor_filter:
@@ -501,6 +506,7 @@ def patient_list(request):
         'page_obj': page,
         'query': query,
         'selected_status': status,
+        'selected_visit_type': visit_type,
         'selected_outcome': outcome,
         'selected_dept': dept_filter,
         'selected_doctor': doctor_filter,
@@ -952,7 +958,7 @@ def patient_card_excel(request, pk):
     ).order_by('service__category__name')
 
     r = 4
-    grand_total = float(services_total or 0) + float(medicines_total or 0)
+    grand_total = 0
 
     for cat in cat_stats:
         cat_name = cat['service__category__name']
