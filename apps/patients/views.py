@@ -171,6 +171,10 @@ def patient_card_pdf(request, pk):
         row("Telefon:", patient.phone or '—'),
         row("Manzil:", full_address),
         row("Ijtimoiy holat:", patient.get_social_status_display() if patient.social_status else '—'),
+         *([row("Ota-ona ismi:", patient.parent_name),
+            row("Ota-ona JSHSHIR:", patient.parent_jshshir or '—'),
+            row("Ota-ona ish joyi:", str(patient.parent_workplace_org) if getattr(patient, 'parent_workplace_org', None) else '—'),
+           ] if patient.social_status == 'dependent' and patient.parent_name else []),
         row("Ish joyi:", patient.workplace or '—'),
         row("Passport:", patient.passport_serial or '—'),
         row("JSHSHIR:", patient.JSHSHIR or '—'),
@@ -882,6 +886,12 @@ def patient_card_excel(request, pk):
     r = info_row(ws1, r, "Telefon", patient.phone or '—')
     r = info_row(ws1, r, "Manzil", full_address)
     r = info_row(ws1, r, "Ijtimoiy holat", patient.get_social_status_display() if patient.social_status else '—')
+    if patient.social_status == 'dependent' and patient.parent_name:
+        r = info_row(ws1, r, "Ota-ona ismi", patient.parent_name)
+        if patient.parent_jshshir:
+            r = info_row(ws1, r, "Ota-ona JSHSHIR", patient.parent_jshshir)
+        if patient.parent_workplace_org:
+            r = info_row(ws1, r, "Ota-ona ish joyi", str(patient.parent_workplace_org))
     r = info_row(ws1, r, "Ish joyi", patient.workplace or '—')
     r = info_row(ws1, r, "Lavozim", patient.position or '—')
     r = info_row(ws1, r, "Passport", patient.passport_serial or '—')

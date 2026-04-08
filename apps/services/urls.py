@@ -35,6 +35,9 @@ urlpatterns = [
     path('operations/service-statistics/', views.operation_service_statistics, name='operation_service_statistics'),
     path('operations/service-statistics/excel/', views.export_operation_service_excel, name='export_operation_service_excel'),
 
+    # Operatsiya belgilash
+    path('mark-operations/', views.mark_operations, name='mark_operations'),
+
     # Export
     path('export/excel/', views.export_services_excel, name='export_services_excel'),
     path('export/pdf/', views.export_services_pdf, name='export_services_pdf'),

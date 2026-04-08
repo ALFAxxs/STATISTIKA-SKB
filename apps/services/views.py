@@ -1610,6 +1610,7 @@ def statistics_combined(request):
     med_qs = PatientMedicine.objects.select_related('medicine', 'patient_card')
     if date_from:   med_qs = med_qs.filter(ordered_at__date__gte=date_from)
     if date_to:     med_qs = med_qs.filter(ordered_at__date__lte=date_to)
+    if patient_cat: med_qs = med_qs.filter(patient_card__patient_category=patient_cat)
     if request.GET.get('medicine'):
         med_qs = med_qs.filter(medicine_id=request.GET['medicine'])
 
@@ -1643,6 +1644,7 @@ def statistics_combined(request):
     ).select_related('operation_type', 'patient_card')
     if date_from:   op_qs = op_qs.filter(operation_date__gte=date_from)
     if date_to:     op_qs = op_qs.filter(operation_date__lte=date_to)
+    if patient_cat: op_qs = op_qs.filter(patient_card__patient_category=patient_cat)
     if request.GET.get('op_type'):
         op_qs = op_qs.filter(operation_type_id=request.GET['op_type'])
 
@@ -1781,4 +1783,53 @@ def statistics_combined(request):
         'op_categories': op_categories,
         'selected_opx_category': request.GET.get('opx_category', ''),
         'selected_patient_cat': patient_cat,
+    })
+
+
+# ==================== OPERATSIYALARNI BELGILASH ====================
+
+@login_required
+@role_required('admin', 'statistician')
+def mark_operations(request):
+    """Xizmatlarni operatsiya deb belgilash sahifasi"""
+    from .models import ServiceCategory
+
+    if request.method == 'POST':
+        action     = request.POST.get('action')
+        service_ids = request.POST.getlist('service_ids')
+        if service_ids:
+            is_op = (action == 'mark')
+            updated = Service.objects.filter(pk__in=service_ids).update(is_operation=is_op)
+            if is_op:
+                messages.success(request, f"✅ {updated} ta xizmat operatsiya deb belgilandi.")
+            else:
+                messages.warning(request, f"❌ {updated} ta xizmatdan operatsiya belgisi olib tashlandi.")
+        else:
+            messages.error(request, "Hech bir xizmat tanlanmadi.")
+        return redirect('mark_operations')
+
+    # Kategoriyalar va ularning xizmatlari
+    categories_raw = ServiceCategory.objects.filter(is_active=True).order_by('name')
+    categories = []
+    total_services = 0
+    total_operations = 0
+
+    for cat in categories_raw:
+        svcs = list(
+            Service.objects.filter(category=cat, is_active=True).order_by('name')
+        )
+        if not svcs:
+            continue
+        op_count  = sum(1 for s in svcs if s.is_operation)
+        cat.services_list = svcs
+        cat.total_count   = len(svcs)
+        cat.op_count      = op_count
+        categories.append(cat)
+        total_services   += len(svcs)
+        total_operations += op_count
+
+    return render(request, 'services/mark_operations.html', {
+        'categories':       categories,
+        'total_services':   total_services,
+        'total_operations': total_operations,
     })

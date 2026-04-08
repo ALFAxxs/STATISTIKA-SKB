@@ -28,6 +28,7 @@ def statistics_dashboard(request):
     org_id = request.GET.get('org', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
+    age_group = request.GET.get('age_group', '')  # under16 / adult
 
     qs = PatientCard.objects.all()
 
@@ -62,6 +63,30 @@ def statistics_dashboard(request):
         qs = qs.filter(admission_date__date__gte=date_from)
     if date_to:
         qs = qs.filter(admission_date__date__lte=date_to)
+
+    # Yosh guruhi filtri — Python da hisoblash (SQLite strftime muammosini chetlab)
+    from datetime import date
+    if age_group in ('under16', 'adult'):
+        from apps.patients.models import PatientCard as PC
+        def calc_age_at_admission(p):
+            if not p.birth_date or not p.admission_date:
+                return None
+            adm = p.admission_date.date() if hasattr(p.admission_date, 'date') else p.admission_date
+            b = p.birth_date
+            age = adm.year - b.year - ((adm.month, adm.day) < (b.month, b.day))
+            return age
+        # Avval birth_date va admission_date bor bemorlarni olish
+        qs = qs.filter(birth_date__isnull=False, admission_date__isnull=False)
+        pks = []
+        for p in qs.only('pk', 'birth_date', 'admission_date'):
+            age = calc_age_at_admission(p)
+            if age is None:
+                continue
+            if age_group == 'under16' and age < 16:
+                pks.append(p.pk)
+            elif age_group == 'adult' and age >= 16:
+                pks.append(p.pk)
+        qs = qs.filter(pk__in=pks)
 
     # ==================== UMUMIY SONLAR ====================
     total = qs.count()
@@ -283,6 +308,13 @@ def statistics_dashboard(request):
         'date_to': date_to,
         'current_filters': current_filters,
         'org_stats': org_stats_list,
+        'age_group': age_group,
+        'under16_count': qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
+            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%d', admission_date) < strftime('%m%d', birth_date)) THEN -1 ELSE 0 END) < 16"]
+        ).count() if not age_group else None,
+        'adult_count': qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
+            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%d', admission_date) < strftime('%m%d', birth_date)) THEN -1 ELSE 0 END) >= 16"]
+        ).count() if not age_group else None,
         'top_medicines': top_medicines,
         'medicines_grand_total': float(medicines_grand_total),
         'services_grand_total': services_grand_total,

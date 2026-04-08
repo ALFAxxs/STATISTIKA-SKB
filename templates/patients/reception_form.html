@@ -164,6 +164,8 @@
                         {{ form.position }}
                     </div>
 
+
+
                     <!-- Urush qatnashchisi — TOGGLE -->
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold d-block">Urush qatnashchisi?</label>
@@ -186,6 +188,79 @@
                                value="{{ form.instance.is_pensioner|yesno:'True,False'|default:'False' }}">
                     </div>
 
+                </div>
+            </div>
+
+
+            <!-- OTA-ONA / VASIY MA'LUMOTLARI — alohida section -->
+            <div id="parent-block-wrapper" style="display:none;">
+                <div class="form-section border-warning" style="border-left:4px solid #ffc107 !important;">
+                    <h5>👨‍👩‍👦 Ota-ona / Vasiy ma'lumotlari
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:13px;">Ota-ona qaramog'ida</span>
+                        <span id="age-display" class="text-muted ms-2" style="font-size:14px;font-weight:400;"></span>
+                    </h5>
+
+                    <!-- 16+ ogohlantirish -->
+                    <div id="railway-adult-warning" style="display:none;">
+                        <div class="alert alert-warning py-2 mb-3">
+                            <strong>⚠️ Diqqat!</strong> Bemor 16 yoshga to'lgan —
+                            kategoriya avtomatik <strong>Pullik</strong> ga o'zgartirildi.
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Ota-ona to'liq ismi -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                Ota-ona / Vasiy ismi <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="parent_name" id="id_parent_name"
+                                   class="form-control"
+                                   placeholder="Karimov Jasur Aliyevich"
+                                   value="{{ form.parent_name.value|default:'' }}">
+                            <div class="form-text text-muted">To'liq ism-familiya sharif</div>
+                        </div>
+
+                        <!-- Ota-ona JSHSHIR — faqat TY uchun -->
+                        <div class="col-md-3 mb-3" id="parent-jshshir-block" style="display:none;">
+                            <label class="form-label fw-bold">
+                                Ota-ona JSHSHIR <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="parent_jshshir" id="id_parent_jshshir"
+                                   class="form-control"
+                                   placeholder="14 raqamli kod"
+                                   maxlength="14"
+                                   value="{{ form.instance.parent_jshshir|default:'' }}">
+                        </div>
+
+                        <!-- Ota-ona ish joyi — faqat TY uchun -->
+                        <div class="col-md-5 mb-3" id="parent-org-block" style="display:none;">
+                            <label class="form-label fw-bold">
+                                Ota-onasining ish joyi
+                                <span class="badge bg-primary ms-1 small">🚂 TY tashkiloti</span>
+                            </label>
+                            <div class="position-relative">
+                                <input type="text" id="parent-org-search"
+                                       class="form-control"
+                                       placeholder="🔍 Korxona kodi, INN yoki nomi..."
+                                       autocomplete="off">
+                                <div id="parent-org-dropdown"
+                                     style="display:none; position:absolute; top:100%; left:0; right:0;
+                                            z-index:1060; background:#fff; border:1px solid #dee2e6;
+                                            border-radius:8px; max-height:260px; overflow-y:auto;
+                                            box-shadow:0 4px 16px rgba(0,0,0,.12);">
+                                </div>
+                            </div>
+                            <input type="hidden" name="parent_workplace_org" id="parent_workplace_org_id" value="">
+                            <div id="parent-org-selected" class="mt-2" style="display:none;">
+                                <div class="alert alert-success py-2 mb-0 d-flex justify-content-between align-items-start">
+                                    <div id="parent-org-info" class="small"></div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                            id="parent-org-clear">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -526,18 +601,175 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const positionField  = document.getElementById('position-field');
 
-    function toggleWorkplace() {
+    // ==================== 16 YOSH TEKSHIRUVI ====================
+    function isUnder16(dateStr) {
+        if (!dateStr) return null; // noma'lum
+        const birth = new Date(dateStr);
+        if (isNaN(birth)) return null;
+        const limit = new Date(birth);
+        limit.setFullYear(limit.getFullYear() + 16);
+        return new Date() < limit; // true = 16 yoshga to'lmagan
+    }
+
+    // ==================== ASOSIY LOGIKA ====================
+    function calcAge(dateStr) {
+        if (!dateStr) return null;
+        const b = new Date(dateStr);
+        if (isNaN(b)) return null;
+        const now = new Date();
+        let y = now.getFullYear() - b.getFullYear();
+        let m = now.getMonth() - b.getMonth();
+        let d = now.getDate() - b.getDate();
+        if (d < 0) { m--; d += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+        if (m < 0) { y--; m += 12; }
+        return { y, m, d };
+    }
+
+    function applyAllLogic() {
         if (!socialStatus) return;
-        const val = socialStatus.value;
-        const showWp  = ['employed', 'student_higher', 'student_school'].includes(val);
-        const showPos = val === 'employed';
-        if (workplaceField) workplaceField.style.display = showWp  ? 'block' : 'none';
-        if (positionField)  positionField.style.display  = showPos ? 'block' : 'none';
+
+        const social    = socialStatus.value;
+        const cat       = catSelectR ? catSelectR.value : '';
+        const bdate     = document.getElementById('id_birth_date') ?
+                          document.getElementById('id_birth_date').value : '';
+        const under16   = isUnder16(bdate);  // true/false/null
+        const age       = calcAge(bdate);
+        const isDepend  = (social === 'dependent');
+        const isRailway = (cat === 'railway');
+        const isEmployed = (social === 'employed');
+
+        // --- Ish joyi va lavozim ko'rsatish ---
+        // Temir yo'lchi + ota-ona qaramog'ida + 16 yoshga to'lmagan => ish joyi YO'Q (ota-ona ish joyi ko'rsatiladi)
+        const isChildRailway = isRailway && isDepend && (under16 === true || under16 === null);
+        const showWorkplace = !isChildRailway && (
+            isRailway || ['employed', 'student_higher', 'student_school'].includes(social)
+        );
+        const showPosition  = isEmployed && !isChildRailway;
+
+        if (workplaceField) workplaceField.style.display = showWorkplace ? 'block' : 'none';
+        if (positionField)  positionField.style.display  = showPosition  ? 'block' : 'none';
+
+        // --- OTA-ONA BLOKI ---
+        const parentWrapper = document.getElementById('parent-block-wrapper');
+        const parentJshshir = document.getElementById('parent-jshshir-block');
+        const parentOrg     = document.getElementById('parent-org-block');
+        const railwayWarn   = document.getElementById('railway-adult-warning');
+
+        if (!isDepend) {
+            // Ota-ona qaramog'ida EMAS — hammani yashir
+            if (parentWrapper) parentWrapper.style.display = 'none';
+            if (railwayWarn)   railwayWarn.style.display   = 'none';
+            return;
+        }
+
+        // Ota-ona qaramog'ida — asosiy blok ko'rsatiladi
+        if (parentWrapper) parentWrapper.style.display = 'block';
+
+        // Yoshni ko'rsatish
+        const ageDisplay = document.getElementById('age-display');
+        if (ageDisplay && age) {
+            const a = age;
+            ageDisplay.textContent = '(' + a.y + ' yosh ' + a.m + ' oy ' + a.d + ' kun)';
+        } else if (ageDisplay) {
+            ageDisplay.textContent = '';
+        }
+
+        if (isRailway) {
+            // TEMIR YO'LCHI + OTA-ONA QARAMOG'IDA
+            if (under16 === true) {
+                // 16 yoshga to'lmagan — railway saqlanadi
+                if (railwayWarn)   railwayWarn.style.display   = 'none';
+                if (parentJshshir) parentJshshir.style.display = 'block';
+                if (parentOrg)     parentOrg.style.display     = 'block';
+            } else if (under16 === false) {
+                // 16 yoshga to'lgan — kategoriyani PULLIK ga o'zgartir
+                if (catSelectR) catSelectR.value = 'paid';
+                if (railwayWarn) railwayWarn.style.display = 'block';
+                if (parentJshshir) parentJshshir.style.display = 'none';
+                if (parentOrg)     parentOrg.style.display     = 'none';
+                updateOrgBlockR('paid');
+            } else {
+                // Tug'ilgan sana kiritilmagan — JSHSHIR va org ko'rsatilsin
+                if (railwayWarn)   railwayWarn.style.display   = 'none';
+                if (parentJshshir) parentJshshir.style.display = 'block';
+                if (parentOrg)     parentOrg.style.display     = 'block';
+            }
+        } else {
+            // BOSHQA KATEGORIYALAR + OTA-ONA QARAMOG'IDA
+            // Faqat ota-ona ismi kerak (JSHSHIR va org kerak emas)
+            if (railwayWarn)   railwayWarn.style.display   = 'none';
+            if (parentJshshir) parentJshshir.style.display = 'none';
+            if (parentOrg)     parentOrg.style.display     = 'none';
+        }
     }
-    if (socialStatus) {
-        socialStatus.addEventListener('change', toggleWorkplace);
-        toggleWorkplace();
-    }
+
+    // Eventlar
+    if (socialStatus) socialStatus.addEventListener('change', applyAllLogic);
+    if (catSelectR)   catSelectR.addEventListener('change',   applyAllLogic);
+    const birthInput = document.getElementById('id_birth_date');
+    if (birthInput)   birthInput.addEventListener('change', applyAllLogic);
+
+    applyAllLogic(); // Sahifa yuklanganda
+
+    // ==================== OTA-ONA ISH JOYI QIDIRUV ====================
+    (function() {
+        const pSearch = document.getElementById('parent-org-search');
+        const pDrop   = document.getElementById('parent-org-dropdown');
+        const pId     = document.getElementById('parent_workplace_org_id');
+        const pSel    = document.getElementById('parent-org-selected');
+        const pInfo   = document.getElementById('parent-org-info');
+        const pClear  = document.getElementById('parent-org-clear');
+        if (!pSearch) return;
+
+        function fetchParentOrgs(q) {
+            pDrop.innerHTML = '<div style="padding:10px;color:#888;">⏳ Qidirilmoqda...</div>';
+            pDrop.style.display = 'block';
+            fetch(`{% url 'organization_search' %}?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.length) {
+                        pDrop.innerHTML = '<div style="padding:10px;color:#888;">Topilmadi</div>';
+                        return;
+                    }
+                    pDrop.innerHTML = data.map(org =>
+                        `<div class="parent-org-item" data-id="${org.id}"
+                              data-name="${org.enterprise_name.replace(/"/g,'&quot;')}"
+                              data-branch="${(org.branch_name||'').replace(/"/g,'&quot;')}"
+                              data-code="${org.enterprise_code}"
+                              style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f1f1;">
+                            <div class="fw-semibold small">${org.enterprise_name}</div>
+                            ${org.branch_name ? `<div class="text-muted small">↳ ${org.branch_name}</div>` : ''}
+                            ${org.enterprise_code ? `<span class="badge bg-light text-dark border small">${org.enterprise_code}</span>` : ''}
+                        </div>`
+                    ).join('');
+                    pDrop.querySelectorAll('.parent-org-item').forEach(item => {
+                        item.addEventListener('mouseenter', () => item.style.background = '#e8f4fd');
+                        item.addEventListener('mouseleave', () => item.style.background = '');
+                        item.addEventListener('click', () => {
+                            pId.value = item.dataset.id;
+                            pSearch.value = '';
+                            pDrop.style.display = 'none';
+                            pSel.style.display = 'block';
+                            let html = `<strong>${item.dataset.name}</strong>`;
+                            if (item.dataset.branch) html += `<br><span class="text-muted">↳ ${item.dataset.branch}</span>`;
+                            if (item.dataset.code) html += `<br><small class="text-muted">Kod: ${item.dataset.code}</small>`;
+                            pInfo.innerHTML = html;
+                        });
+                    });
+                });
+        }
+
+        pSearch.addEventListener('input',  () => fetchParentOrgs(pSearch.value));
+        pSearch.addEventListener('focus',  () => fetchParentOrgs(pSearch.value));
+        if (pClear) pClear.addEventListener('click', () => {
+            pId.value = ''; pSel.style.display = 'none';
+            pInfo.innerHTML = ''; pSearch.value = ''; pSearch.focus();
+        });
+        document.addEventListener('click', e => {
+            if (pDrop && !pDrop.contains(e.target) && e.target !== pSearch)
+                pDrop.style.display = 'none';
+        });
+    })();
 
     // ==================== YO'LLANMA TURI ====================
     const referralType = document.getElementById('id_referral_type');

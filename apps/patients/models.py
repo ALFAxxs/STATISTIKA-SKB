@@ -262,6 +262,12 @@ class PatientCard(models.Model):
     ]
     social_status = models.CharField(max_length=20, choices=SOCIAL_STATUS_CHOICES, blank=True)
     workplace = models.CharField(max_length=255, blank=True, verbose_name="Ish joyi / O'quv joyi")
+    parent_name = models.CharField(max_length=255, blank=True, verbose_name="Ota-ona / Vasiy ismi")
+    parent_jshshir = models.CharField(max_length=14, blank=True, verbose_name="Ota-ona JSHSHIR")
+    parent_workplace_org = models.ForeignKey(
+        'Organization', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='children_patients', verbose_name="Ota-ona ish joyi"
+    )
     workplace_org = models.ForeignKey(
         Organization,
         on_delete=models.SET_NULL,

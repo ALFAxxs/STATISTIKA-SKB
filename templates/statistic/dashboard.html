@@ -101,6 +101,14 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label small">Yosh guruhi</label>
+                    <select name="age_group" class="form-select form-select-sm">
+                        <option value="">Barchasi</option>
+                        <option value="under16" {% if age_group == 'under16' %}selected{% endif %}>👶 16 yoshgacha</option>
+                        <option value="adult"   {% if age_group == 'adult'   %}selected{% endif %}>🧑 16 yoshdan katta</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label small">Rezidentlik</label>
                     <select name="resident_status" class="form-select form-select-sm">
                         <option value="">Barchasi</option>
@@ -233,6 +241,60 @@
             <div class="card-body"><canvas id="monthlyChart" height="100"></canvas></div>
         </div>
     </div>
+    <!-- Yosh guruhi -->
+    <div class="col-12 mb-2">
+        {% if not age_group %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body d-flex align-items-center gap-3 py-2">
+                        <div style="font-size:32px">👶</div>
+                        <div class="flex-fill">
+                            <div class="text-muted small">16 yoshgacha bemorlar</div>
+                            <div class="h4 fw-bold text-warning mb-0">{{ under16_count|default:0 }} ta</div>
+                            {% if total and under16_count %}
+                            <div class="progress mt-1" style="height:3px;">
+                                <div class="progress-bar bg-warning" style="width:{% widthratio under16_count total 100 %}%"></div>
+                            </div>
+                            <div class="text-muted small">Jami bemorlarning {% widthratio under16_count total 100 %}%</div>
+                            {% endif %}
+                        </div>
+                        <a href="?age_group=under16&year={{ selected_year }}&month={{ selected_month }}&department={{ selected_department }}&patient_category={{ selected_category }}"
+                           class="btn btn-sm btn-outline-warning">Ko'rish</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body d-flex align-items-center gap-3 py-2">
+                        <div style="font-size:32px">🧑</div>
+                        <div class="flex-fill">
+                            <div class="text-muted small">16 yoshdan katta bemorlar</div>
+                            <div class="h4 fw-bold text-info mb-0">{{ adult_count|default:0 }} ta</div>
+                            {% if total and adult_count %}
+                            <div class="progress mt-1" style="height:3px;">
+                                <div class="progress-bar bg-info" style="width:{% widthratio adult_count total 100 %}%"></div>
+                            </div>
+                            <div class="text-muted small">Jami bemorlarning {% widthratio adult_count total 100 %}%</div>
+                            {% endif %}
+                        </div>
+                        <a href="?age_group=adult&year={{ selected_year }}&month={{ selected_month }}&department={{ selected_department }}&patient_category={{ selected_category }}"
+                           class="btn btn-sm btn-outline-info">Ko'rish</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-0">
+            {% if age_group == 'under16' %}👶 <strong>16 yoshgacha bemorlar:</strong>
+            {% else %}🧑 <strong>16 yoshdan katta bemorlar:</strong>{% endif %}
+            {{ total }} ta bemor ko'rsatilmoqda
+            <a href="?year={{ selected_year }}&month={{ selected_month }}&department={{ selected_department }}&patient_category={{ selected_category }}"
+               class="btn btn-sm btn-outline-secondary ms-auto">✕ Filtrni olib tashlash</a>
+        </div>
+        {% endif %}
+    </div>
+
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">Jins bo'yicha</div>

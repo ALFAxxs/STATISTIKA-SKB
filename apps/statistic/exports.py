@@ -67,6 +67,21 @@ def get_filtered_queryset(request):
         qs = qs.filter(admission_date__date__gte=date_from)
     if date_to:
         qs = qs.filter(admission_date__date__lte=date_to)
+
+    from datetime import date as dt_date, timedelta
+    age_group = request.GET.get('age_group', '')
+    if age_group == 'under16':
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
+        # Python darajasida 16 yoshgacha filtrlash
+        today = date.today()
+        cutoff = today - relativedelta(years=16)  # 16 yil oldingi sana
+        qs = qs.filter(birth_date__isnull=False, birth_date__gt=cutoff)
+    elif age_group == 'adult':
+        qs = qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
+            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%%d', admission_date) < strftime('%m%%d', birth_date)) THEN -1 ELSE 0 END) >= 16"]
+        )
+
     org_id = request.GET.get('org')
     if org_id:
         qs = qs.filter(workplace_org_id=org_id)
@@ -291,6 +306,7 @@ def export_excel(request):
     BEM_HEADS = [
         '№', 'F.I.Sh', 'Qabul sanasi va vaqt', "Tug'ilgan sana",
         'Passport', 'JSHSHIR', 'Yashash manzili', 'Lavozimi', 'Ish joyi',
+        'Ota-ona ismi', 'Ota-ona JSHSHIR', 'Ota-ona ish joyi',
         'Qabulxona tashxisi', "Bo'lim", 'Bemor turi',
         'Yotoq kun', 'Yil boshidan', 'Jami tashriflar',
         'Xizmat turi', "Xizmat summasi (so'm)",
@@ -298,7 +314,7 @@ def export_excel(request):
     ]
 
     # Ustun kengliklari
-    col_widths_4 = [5, 28, 18, 14, 14, 16, 30, 18, 28, 30, 20, 14, 10, 12, 14, 25, 18, 25, 18]
+    col_widths_4 = [5, 28, 18, 14, 14, 16, 30, 18, 28, 24, 16, 26, 30, 20, 14, 10, 12, 14, 25, 18, 25, 18]
     for ci, w in enumerate(col_widths_4, 1):
         ws4.column_dimensions[get_column_letter(ci)].width = w
 
@@ -354,6 +370,13 @@ def export_excel(request):
         elif patient.workplace:
             workplace = patient.workplace
 
+        # Ota-ona ma'lumotlari (16 yoshgacha temir yo'lchi bolalar uchun)
+        parent_name_val = patient.parent_name or '—'
+        parent_jshshir_val = patient.parent_jshshir or '—'
+        parent_org_val = '—'
+        if hasattr(patient, 'parent_workplace_org') and patient.parent_workplace_org:
+            parent_org_val = str(patient.parent_workplace_org)
+
         # Tashriflar soni
         from apps.patients.models import PatientCard as PC
         visits_year  = PC.objects.filter(
@@ -404,6 +427,9 @@ def export_excel(request):
                     address,
                     patient.position or '—',
                     workplace or '—',
+                    parent_name_val,
+                    parent_jshshir_val,
+                    parent_org_val,
                     patient.admission_diagnosis or '—',
                     str(patient.department) if patient.department else '—',
                     patient.get_patient_category_display(),
@@ -504,6 +530,7 @@ def export_excel(request):
     FIXED = [
         '№', 'F.I.Sh', 'Qabul sanasi', "Tug'ilgan sana",
         'Passport', 'JSHSHIR', 'Yashash manzili', 'Lavozimi', 'Ish joyi',
+        'Ota-ona ismi', 'Ota-ona JSHSHIR', 'Ota-ona ish joyi',
         'Qabulxona tashxisi', "Bo'lim", 'Bemor turi',
         'Yotoq kun', 'Yil boshidan', 'Jami tashriflar',
     ]
@@ -511,7 +538,7 @@ def export_excel(request):
     total_cols5 = len(all_headers)
 
     # Ustun kengliklari
-    fixed_widths = [5, 28, 16, 14, 14, 16, 28, 16, 25, 28, 18, 14, 10, 12, 14]
+    fixed_widths = [5, 28, 16, 14, 14, 16, 28, 16, 25, 22, 14, 24, 28, 18, 14, 10, 12, 14]
     ws5.column_dimensions['A'].width = 5
     for ci, w in enumerate(fixed_widths, 1):
         ws5.column_dimensions[get_column_letter(ci)].width = w
@@ -581,6 +608,9 @@ def export_excel(request):
             address,
             patient.position or '—',
             workplace,
+            patient.parent_name or '—',
+            patient.parent_jshshir or '—',
+            str(patient.parent_workplace_org) if getattr(patient, 'parent_workplace_org', None) else '—',
             patient.admission_diagnosis or '—',
             str(patient.department) if patient.department else '—',
             patient.get_patient_category_display(),

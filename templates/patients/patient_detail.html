@@ -46,6 +46,13 @@
             <div class="col-md-2">
                 <strong>Ijtimoiy holat:</strong><br>
                 {{ patient.get_social_status_display }}
+                {% if patient.social_status == 'dependent' and patient.parent_name %}
+                <div class="mt-1 p-2 bg-light rounded border small">
+                    👨‍👩‍👦 <strong>Ota-ona:</strong> {{ patient.parent_name }}
+                    {% if patient.parent_jshshir %}<br>JSHSHIR: {{ patient.parent_jshshir }}{% endif %}
+                    {% if patient.parent_workplace_org %}<br>Ish joyi: {{ patient.parent_workplace_org }}{% endif %}
+                </div>
+                {% endif %}
             </div>
             {% if patient.resident_status == 'resident' %}
             <div class="col-md-3">
@@ -96,6 +103,14 @@
             <div class="col-md-2">
                 <strong>Bo'lim:</strong><br>
                 {{ patient.department|default:"—" }}
+            </div>
+            <div class="col-md-2">
+                <strong>Tashrif turi:</strong><br>
+                {% if patient.visit_type == 'ambulatory' %}
+                <span class="badge" style="background:#6f42c1;font-size:13px;">🚶 Ambulator</span>
+                {% else %}
+                <span class="badge bg-info text-dark" style="font-size:13px;">🏥 Statsionar</span>
+                {% endif %}
             </div>
 
             <div class="col-md-4 mt-2">
