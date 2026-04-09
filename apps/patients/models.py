@@ -328,6 +328,7 @@ class PatientCard(models.Model):
         max_length=15,
         choices=IS_AMBULATORY_CHOICES,
         default='inpatient',
+        blank=True,
         verbose_name="Tashrif turi"
     )
 

@@ -477,7 +477,9 @@
 {% endif %}
 
 <div class="d-flex gap-2 mb-5">
-    <a href="{% url 'export_excel' %}?{{ current_filters }}" class="btn btn-success">📥 Excel</a>
+    <a href="{% url 'export_excel' %}?{{ current_filters }}" class="btn btn-success">📥 Excel (eski)</a>
+    <a href="{% url 'export_monthly_report' %}?{{ current_filters }}" class="btn btn-warning text-dark">📋 Oylik rasmiy hisobot</a>
+    <a href="{% url 'export_full_report' %}?{{ current_filters }}" class="btn btn-primary">📊 To'liq hisobot (8 sheet)</a>
     <a href="{% url 'export_pdf' %}?{{ current_filters }}" class="btn btn-danger">📄 PDF</a>
 </div>
 

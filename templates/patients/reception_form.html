@@ -27,6 +27,7 @@
         <h3>{{ title }}</h3>
         <form method="post">
             {% csrf_token %}
+    <input type="hidden" name="visit_type" value="inpatient">
 
             {% if form.errors %}
             <div class="alert alert-danger">

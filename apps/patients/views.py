@@ -264,12 +264,16 @@ def patient_card_pdf(request, pk):
         elements.append(Spacer(1, 0.2*cm))
 
         # Kategoriya bo'yicha guruhlash
-        cat_stats = patient_services.values(
-            'service__category__name',
-        ).annotate(
-            count=Count('id'),
-            total=Sum('price'),
-        ).order_by('service__category__name')
+        from collections import defaultdict as _dd
+        _cm = _dd(lambda: {'count': 0, 'total': 0.0})
+        for _s in patient_services:
+            _k = _s.service.category.name if _s.service.category else 'Boshqa'
+            _cm[_k]['count'] += 1
+            _cm[_k]['total'] += float((_s.price or 0) * (_s.quantity or 1))
+        cat_stats = [
+            {'service__category__name': k, 'count': v['count'], 'total': v['total']}
+            for k, v in sorted(_cm.items())
+        ]
 
         # Sarlavha
         svc_header = [
@@ -687,7 +691,11 @@ def patient_card_edit(request, pk):
 
         if is_reception:
             if form.is_valid():
-                form.save()
+                obj = form.save(commit=False)
+                # visit_type formada yo'q — mavjud qiymatni saqlash
+                if not obj.visit_type:
+                    obj.visit_type = patient.visit_type or 'inpatient'
+                obj.save()
                 messages.success(request, "Ma'lumotlar yangilandi!")
                 return redirect('patient_list')
             else:
@@ -702,7 +710,12 @@ def patient_card_edit(request, pk):
                 forms_valid = forms_valid and death_form.is_valid()
 
             if forms_valid:
-                patient = form.save()
+                obj = form.save(commit=False)
+                # visit_type formada yo'q — mavjud qiymatni saqlash
+                if not obj.visit_type:
+                    obj.visit_type = patient.visit_type or 'inpatient'
+                obj.save()
+                patient = obj
                 surgeries = surgery_formset.save(commit=False)
                 for s in surgeries:
                     s.patient_card = patient
@@ -960,12 +973,16 @@ def patient_card_excel(request, pk):
         patient_card=patient
     ).select_related('service__category').order_by('service__category__name', 'service__name')
 
-    cat_stats = patient_services.values(
-        'service__category__name'
-    ).annotate(
-        count=Count('id'),
-        total=Sum('price'),
-    ).order_by('service__category__name')
+    from collections import defaultdict as _dd2
+    _cm2 = _dd2(lambda: {'count': 0, 'total': 0.0})
+    for _s in patient_services:
+        _k = _s.service.category.name if _s.service.category else 'Boshqa'
+        _cm2[_k]['count'] += 1
+        _cm2[_k]['total'] += float((_s.price or 0) * (_s.quantity or 1))
+    cat_stats = [
+        {'service__category__name': k, 'count': v['count'], 'total': v['total']}
+        for k, v in sorted(_cm2.items())
+    ]
 
     r = 4
     grand_total = 0

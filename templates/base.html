@@ -89,11 +89,7 @@
                         <a href="{% url 'service_statistics' %}" class="text-white text-decoration-none">
                             📊 Xizmatlar statistikasi
                         </a>
-                        {% if request.user.role == 'admin' or request.user.is_superuser %}
-                        <a href="{% url 'mark_operations' %}" class="text-white text-decoration-none">
-                            🔪 Op. belgilash
-                        </a>
-                        {% endif %}
+
                     {% endif %}
 
                     <!-- Foydalanuvchilar — faqat admin -->

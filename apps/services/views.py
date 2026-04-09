@@ -101,13 +101,10 @@ def patient_services(request, patient_pk):
         total=Sum('price'),
     ).order_by('-total')
 
-    # Bo'lim shifokorlari
-    if patient.department:
-        doctors = Doctor.objects.filter(
-            department=patient.department, is_active=True
-        ).order_by('-is_head', 'full_name')
-    else:
-        doctors = Doctor.objects.filter(is_active=True).order_by('full_name')
+    # Barcha aktiv shifokorlar (bo'lim bo'yicha guruhlab)
+    doctors = Doctor.objects.filter(
+        is_active=True
+    ).select_related('department').order_by('department__name', '-is_head', 'full_name')
 
     from .models import PatientMedicine
     medicines = PatientMedicine.objects.filter(

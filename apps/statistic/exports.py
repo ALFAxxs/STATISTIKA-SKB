@@ -78,9 +78,11 @@ def get_filtered_queryset(request):
         cutoff = today - relativedelta(years=16)  # 16 yil oldingi sana
         qs = qs.filter(birth_date__isnull=False, birth_date__gt=cutoff)
     elif age_group == 'adult':
-        qs = qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
-            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%%d', admission_date) < strftime('%m%%d', birth_date)) THEN -1 ELSE 0 END) >= 16"]
-        )
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
+        today = date.today()
+        cutoff = today - relativedelta(years=16)
+        qs = qs.filter(birth_date__isnull=False, birth_date__lte=cutoff)
 
     org_id = request.GET.get('org')
     if org_id:

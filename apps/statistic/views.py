@@ -64,6 +64,10 @@ def statistics_dashboard(request):
     if date_to:
         qs = qs.filter(admission_date__date__lte=date_to)
 
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta as _rd
+    cutoff_16 = _date.today() - _rd(years=16)
+
     # Yosh guruhi filtri — Python da hisoblash (SQLite strftime muammosini chetlab)
     from datetime import date
     if age_group in ('under16', 'adult'):
@@ -309,12 +313,8 @@ def statistics_dashboard(request):
         'current_filters': current_filters,
         'org_stats': org_stats_list,
         'age_group': age_group,
-        'under16_count': qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
-            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%d', admission_date) < strftime('%m%d', birth_date)) THEN -1 ELSE 0 END) < 16"]
-        ).count() if not age_group else None,
-        'adult_count': qs.filter(birth_date__isnull=False, admission_date__isnull=False).extra(
-            where=["((CAST(strftime('%Y', admission_date) AS INTEGER) - CAST(strftime('%Y', birth_date) AS INTEGER)) + CASE WHEN (strftime('%m%d', admission_date) < strftime('%m%d', birth_date)) THEN -1 ELSE 0 END) >= 16"]
-        ).count() if not age_group else None,
+        'under16_count': qs.filter(birth_date__isnull=False, birth_date__gt=cutoff_16).count() if not age_group else None,
+        'adult_count':   qs.filter(birth_date__isnull=False, birth_date__lte=cutoff_16).count() if not age_group else None,
         'top_medicines': top_medicines,
         'medicines_grand_total': float(medicines_grand_total),
         'services_grand_total': services_grand_total,
