@@ -455,9 +455,7 @@ def patient_list(request):
     # Bo'lim filteri
     qs = department_filter(qs, request.user)
 
-    # Qabulxona faqat o'zi registratsiya qilganlarni ko'radi
-    if request.user.role == 'reception':
-        qs = qs.filter(registered_by=request.user)
+    # Qabulxona barcha bemorlarni ko'radi (filtrsiz)
 
     # Qidiruv
     query = request.GET.get('q', '')
@@ -670,13 +668,9 @@ def patient_card_create(request):
 def patient_card_edit(request, pk):
     patient = get_object_or_404(PatientCard, pk=pk)
 
-    # Ruxsat tekshiruvi
-    if not request.user.is_superuser and request.user.role != 'admin':
-        if request.user.role == 'reception':
-            if patient.registered_by != request.user:
-                messages.error(request, "Siz bu bemorni tahrirlay olmaysiz.")
-                return redirect('patient_list')
-        elif request.user.department and patient.department != request.user.department:
+    # Ruxsat tekshiruvi — shifokor faqat o'z bo'limini tahrirlaydi
+    if not request.user.is_superuser and request.user.role not in ('admin', 'reception'):
+        if request.user.department and patient.department != request.user.department:
             messages.error(request, "Siz bu bemorni tahrirlay olmaysiz.")
             return redirect('patient_list')
 
