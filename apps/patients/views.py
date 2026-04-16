@@ -491,9 +491,22 @@ def patient_list(request):
     if doctor_filter:
         qs = qs.filter(attending_doctor_id=doctor_filter)
 
+    # Bemor kategoriyasi filteri
+    category_filter = request.GET.get('category', '')
+    if category_filter:
+        qs = qs.filter(patient_category=category_filter)
+
+    # Sana filteri
+    date_from = request.GET.get('date_from', '')
+    date_to   = request.GET.get('date_to', '')
+    if date_from:
+        qs = qs.filter(admission_date__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(admission_date__date__lte=date_to)
+
     # Filter uchun ro'yxatlar
     from .models import Department, Doctor
-    if request.user.is_superuser or request.user.role == 'admin':
+    if request.user.is_superuser or request.user.role in ('admin', 'reception', 'statistician'):
         departments = Department.objects.filter(is_active=True)
     else:
         departments = Department.objects.filter(
@@ -501,11 +514,20 @@ def patient_list(request):
         ) if request.user.department else Department.objects.none()
 
     doctors = Doctor.objects.filter(is_active=True).select_related('department')
-    if not request.user.is_superuser and request.user.role != 'admin':
+    if not request.user.is_superuser and request.user.role not in ('admin', 'reception', 'statistician'):
         if request.user.department:
             doctors = doctors.filter(department=request.user.department)
 
-    paginator = Paginator(qs, 20)
+    # Sahifa o'lchami
+    per_page = request.GET.get('per_page', '20')
+    try:
+        per_page = int(per_page)
+        if per_page not in (20, 50, 100):
+            per_page = 20
+    except ValueError:
+        per_page = 20
+
+    paginator = Paginator(qs, per_page)
     page = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'patients/patient_list.html', {
@@ -516,8 +538,13 @@ def patient_list(request):
         'selected_outcome': outcome,
         'selected_dept': dept_filter,
         'selected_doctor': doctor_filter,
+        'selected_category': category_filter,
+        'selected_date_from': date_from,
+        'selected_date_to': date_to,
+        'selected_per_page': per_page,
         'departments': departments,
         'doctors': doctors,
+        'total_count': qs.count(),
     })
 
 

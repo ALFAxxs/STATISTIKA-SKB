@@ -476,8 +476,11 @@ def _sheet_organizations(wb, qs, S, filter_text):
         cnt = org['cnt']
         inp = oqs.filter(visit_type='inpatient').count()
         amb = oqs.filter(visit_type='ambulatory').count()
-        svc = float(PatientService.objects.filter(patient_card__in=oqs).aggregate(t=Sum('price'))['t'] or 0)
-        med = float(PatientMedicine.objects.filter(patient_card__in=oqs).aggregate(t=Sum('price'))['t'] or 0)
+        from django.db.models import ExpressionWrapper, DecimalField, F
+        px_svc = ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())
+        px_med = ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())
+        svc = float(PatientService.objects.filter(patient_card__in=oqs).annotate(pxq=px_svc).aggregate(t=Sum('pxq'))['t'] or 0)
+        med = float(PatientMedicine.objects.filter(patient_card__in=oqs).annotate(pxq=px_med).aggregate(t=Sum('pxq'))['t'] or 0)
         tot = svc + med
 
         vals = [i, org['workplace_org__enterprise_name'] or '—',

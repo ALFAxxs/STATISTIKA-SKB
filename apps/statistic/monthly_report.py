@@ -43,8 +43,23 @@ def S():
     }
 
 
+def _safe_cell(ws, row, col, value=None):
+    """MergedCell xatosini oldini oluvchi ws.cell o'rini bosuvchi"""
+    from openpyxl.cell.cell import MergedCell
+    cell = ws.cell(row=row, column=col)
+    if isinstance(cell, MergedCell):
+        return cell
+    if value is not None:
+        cell.value = value
+    return cell
+
+
 def c(ws, row, col, value, style, font=None, fill=None, align=None, border=None, numfmt=None):
-    cell = ws.cell(row=row, column=col, value=value)
+    from openpyxl.cell.cell import MergedCell
+    cell = ws.cell(row=row, column=col)
+    if isinstance(cell, MergedCell):
+        return cell  # Merge qilingan katakka yozib bo'lmaydi
+    cell.value = value
     if font:   cell.font = font
     if fill:   cell.fill = fill
     if align:  cell.alignment = align
@@ -54,6 +69,11 @@ def c(ws, row, col, value, style, font=None, fill=None, align=None, border=None,
 
 
 def merge(ws, r1, c1, r2, c2, value, style, **kw):
+    # Avvalgi merge ni olib tashlash (agar bo'lsa)
+    try:
+        ws.unmerge_cells(start_row=r1, start_column=c1, end_row=r2, end_column=c2)
+    except Exception:
+        pass
     ws.merge_cells(start_row=r1, start_column=c1, end_row=r2, end_column=c2)
     return c(ws, r1, c1, value, style, **kw)
 
@@ -160,8 +180,12 @@ def sheet_orinlar_fondi(wb, qs, year, month, S_):
         ws.row_dimensions[r].height = 40
 
         # Sarlavha
+        try:
+            ws.unmerge_cells(start_row=r, start_column=1, end_row=r, end_column=17)
+        except Exception:
+            pass
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=17)
-        cell = ws.cell(row=r, column=1, value=title)
+        cell = _safe_cell(ws, r, 1, title)
         cell.font = Font(bold=True, size=10)
         cell.alignment = S_['C']
         r += 1
@@ -197,13 +221,20 @@ def sheet_orinlar_fondi(wb, qs, year, month, S_):
 
         for rd, col, rs, cs, text in hdr_data:
             if rs > 1 or cs > 1:
+                try:
+                    ws.unmerge_cells(start_row=r+rd, start_column=col, end_row=r+rd+rs-1, end_column=col+cs-1)
+                except Exception:
+                    pass
                 ws.merge_cells(start_row=r+rd, start_column=col, end_row=r+rd+rs-1, end_column=col+cs-1)
-            cell = ws.cell(row=r+rd, column=col, value=text)
-            cell.font = S_['BOLD']; cell.alignment = S_['C']
-            cell.border = S_['thin']; cell.fill = S_['BLUE']
+            from openpyxl.cell.cell import MergedCell
+            raw = ws.cell(row=r+rd, column=col)
+            if not isinstance(raw, MergedCell):
+                raw.value = text
+                raw.font = S_['BOLD']; raw.alignment = S_['C']
+                raw.border = S_['thin']; raw.fill = S_['BLUE']
 
         for rd, col, text in sub_hdrs:
-            cell = ws.cell(row=r+rd, column=col, value=text)
+            cell = _safe_cell(ws, r+rd, col, text)
             cell.font = S_['BOLD']; cell.alignment = S_['C']
             cell.border = S_['thin']; cell.fill = S_['BLUE']
 
@@ -349,9 +380,9 @@ def sheet_orinlar_fondi(wb, qs, year, month, S_):
             ("Direktor", ""), ("Bosh shifokor", ""), ("Bosh hisobchi", ""), ("Iqtisodchi", "")
         ]:
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
-            ws.cell(row=r, column=2, value=label).font = S_['NORM']
+            _safe_cell(ws, r, 2, label).font = S_['NORM']
             ws.merge_cells(start_row=r, start_column=10, end_row=r, end_column=13)
-            ws.cell(row=r, column=10, value=name_val).font = S_['NORM']
+            _safe_cell(ws, r, 10, name_val).font = S_['NORM']
             ws.row_dimensions[r].height = 14
             r += 1
 
@@ -401,7 +432,7 @@ def sheet_operatsiyalar(wb, qs, year, month, S_):
 
         # Sarlavha
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=14)
-        cell = ws.cell(row=r, column=1, value=category_label)
+        cell = _safe_cell(ws, r, 1, category_label)
         cell.font = Font(bold=True, size=11)
         cell.alignment = S_['C']
         cell.fill = S_['BLUE']
@@ -414,7 +445,7 @@ def sheet_operatsiyalar(wb, qs, year, month, S_):
                 "Operatsiyalar soni", "Shoshilinch", "18 yosh.", "Ekstr.",
                 "Vafot\n(op. keyin)", "Jarroh.\nfaolligi %"]
         for ci, h in enumerate(hdrs, 1):
-            cell = ws.cell(row=r, column=ci, value=h)
+            cell = _safe_cell(ws, r, ci, h)
             cell.font = S_['BOLD']; cell.alignment = S_['C']
             cell.border = S_['thin']; cell.fill = S_['BLUE']
         ws.row_dimensions[r].height = 30
@@ -458,7 +489,7 @@ def sheet_operatsiyalar(wb, qs, year, month, S_):
                     deceased_after_op, jar_faol]
 
             for ci, val in enumerate(vals, 1):
-                cell = ws.cell(row=r, column=ci, value=val)
+                cell = _safe_cell(ws, r, ci, val)
                 cell.font = S_['NORM']; cell.border = S_['thin']
                 cell.alignment = S_['C'] if ci != 2 else S_['L']
                 if ci == 14 and isinstance(val, float):
@@ -468,7 +499,7 @@ def sheet_operatsiyalar(wb, qs, year, month, S_):
 
         # Jami
         jami_discharged = sum(dept_rows)
-        ws.cell(row=r, column=2, value="JAMI:").font = S_['BOLD']
+        _safe_cell(ws, r, 2, "JAMI:").font = S_['BOLD']
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
         jami_ops = SurgicalOperation.objects.filter(patient_card__in=qs_sect)
         jami_op_pts = jami_ops.values('patient_card').distinct().count()
@@ -478,7 +509,7 @@ def sheet_operatsiyalar(wb, qs, year, month, S_):
                      jami_op_cnt, 0, 0, 0, 0,
                      pct(jami_op_pts, jami_discharged)]
         for ci, val in enumerate(jami_vals, 1):
-            cell = ws.cell(row=r, column=ci, value=val)
+            cell = _safe_cell(ws, r, ci, val)
             cell.font = S_['BOLD']; cell.border = S_['thin']
             cell.fill = S_['GREEN']; cell.alignment = S_['C']
         ws.row_dimensions[r].height = 18
@@ -520,7 +551,7 @@ def sheet_xizmatlar(wb, qs, year, month, S_):
 
     hdrs = ['№', 'Kategoriya', "TY (so'm)", "Pullik (so'm)", "Norezident (so'm)", "JAMI (so'm)"]
     for ci, h in enumerate(hdrs, 1):
-        cell = ws.cell(row=2, column=ci, value=h)
+        cell = _safe_cell(ws, 2, ci, h)
         cell.font = S_['BOLD']; cell.alignment = S_['C']
         cell.border = S_['thin']; cell.fill = S_['BLUE']
     ws.row_dimensions[2].height = 22
@@ -539,7 +570,7 @@ def sheet_xizmatlar(wb, qs, year, month, S_):
         if tot == 0: continue
         vals = [num, f"{cat.icon or ''} {cat.name}", ry, pd, nr, tot]
         for ci, val in enumerate(vals, 1):
-            cell = ws.cell(row=r, column=ci, value=val)
+            cell = _safe_cell(ws, r, ci, val)
             cell.font = S_['NORM']; cell.border = S_['thin']
             cell.alignment = S_['C'] if ci == 1 else (S_['L'] if ci == 2 else S_['R'])
             if ci > 2: cell.number_format = '#,##0'
@@ -558,7 +589,7 @@ def sheet_xizmatlar(wb, qs, year, month, S_):
     if m_tot:
         vals = [r-2, '💊 Dori-darmonlar', m_ry, m_pd, m_nr, m_tot]
         for ci, val in enumerate(vals, 1):
-            cell = ws.cell(row=r, column=ci, value=val)
+            cell = _safe_cell(ws, r, ci, val)
             cell.font = S_['BOLD']; cell.border = S_['thin']
             cell.fill = S_['YELL']
             cell.alignment = S_['C'] if ci == 1 else (S_['L'] if ci == 2 else S_['R'])
@@ -571,7 +602,7 @@ def sheet_xizmatlar(wb, qs, year, month, S_):
     # Jami
     jami_vals = ['', 'UMUMIY JAMI:'] + grand
     for ci, val in enumerate(jami_vals, 1):
-        cell = ws.cell(row=r, column=ci, value=val)
+        cell = _safe_cell(ws, r, ci, val)
         cell.font = S_['BOLD']; cell.border = S_['thin']; cell.fill = S_['GREEN']
         cell.alignment = S_['C'] if ci == 1 else (S_['L'] if ci == 2 else S_['R'])
         if ci > 2: cell.number_format = '#,##0'

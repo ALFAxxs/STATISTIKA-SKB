@@ -458,6 +458,7 @@
 </div>
 
 <!-- 9b. Dori-darmonlar -->
+{% if patient.status == 'statsionar' %}
 <div class="card mb-4">
     <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
         <strong>💊 Dori-darmonlar
@@ -511,14 +512,16 @@
         {% endif %}
     </div>
 </div>
-
+{% endif %}
 <!-- Umumiy jami -->
 {% if services_total or medicines_total %}
 <div class="card mb-4 border-success">
     <div class="card-body py-3 d-flex justify-content-between align-items-center">
         <div class="d-flex gap-4">
             <span class="text-muted small">Xizmatlar: <strong class="text-info">{{ services_total|floatformat:0 }} so'm</strong></span>
+         {% if patient.status == 'statsionar' %}
             <span class="text-muted small">Dorilar: <strong class="text-warning">{{ medicines_total|floatformat:0 }} so'm</strong></span>
+        {% endif %}
         </div>
         <div>
             <strong class="text-muted me-2">Umumiy jami:</strong>
@@ -564,6 +567,7 @@
 
 <!-- Bo'lim ko'chirish formasi -->
 {% if request.user.role in 'admin,doctor,statistician' or request.user.is_superuser %}
+{% if patient.status == 'statsionar' %}
 {% if patient.status != 'completed' %}
 <div class="card mb-4">
     <div class="card-header bg-light">
@@ -596,6 +600,7 @@
         </form>
     </div>
 </div>
+{% endif %}
 {% endif %}
 {% endif %}
 
