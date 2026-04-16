@@ -8,10 +8,12 @@ from apps.patients.models import (
     PatientCard, Department, Doctor,
     Organization, HospitalType
 )
+from apps.users.decorators import role_required
 import json
 
 
 @login_required
+@role_required('admin', 'statistician', 'doctor', 'viewer')
 def statistics_dashboard(request):
 
     # ==================== FILTERLAR ====================
