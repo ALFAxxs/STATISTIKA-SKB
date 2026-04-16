@@ -267,6 +267,7 @@ def _sheet_services(wb, qs, S, filter_text):
     r = _col_hdrs(ws, r, headers, widths, S)
 
     from apps.services.models import ServiceCategory
+    from django.db.models import ExpressionWrapper, DecimalField, F
     cats = ServiceCategory.objects.filter(is_active=True).order_by('name')
     grand_sum = 0
     for i, cat in enumerate(cats, 1):
@@ -275,13 +276,22 @@ def _sheet_services(wb, qs, S, filter_text):
         )
         total_cnt = sqs.count()
         if total_cnt == 0: continue
+        # Jami xizmat miqdori (quantity larni yig'ish)
+        total_qty = sqs.aggregate(t=Sum('quantity'))['t'] or 0
         patients_cnt = sqs.values('patient_card').distinct().count()
-        ry_sum  = float(sqs.filter(patient_card__patient_category='railway').aggregate(t=Sum('price'))['t'] or 0)
-        pd_sum  = float(sqs.filter(patient_card__patient_category='paid').aggregate(t=Sum('price'))['t'] or 0)
-        nr_sum  = float(sqs.filter(patient_card__patient_category='non_resident').aggregate(t=Sum('price'))['t'] or 0)
+        # Summa = price * quantity (har bir xizmat miqdori bilan)
+        price_x_qty = ExpressionWrapper(
+            F('price') * F('quantity'), output_field=DecimalField()
+        )
+        ry_sum = float(sqs.filter(patient_card__patient_category='railway').annotate(
+            pxq=price_x_qty).aggregate(t=Sum('pxq'))['t'] or 0)
+        pd_sum = float(sqs.filter(patient_card__patient_category='paid').annotate(
+            pxq=price_x_qty).aggregate(t=Sum('pxq'))['t'] or 0)
+        nr_sum = float(sqs.filter(patient_card__patient_category='non_resident').annotate(
+            pxq=price_x_qty).aggregate(t=Sum('pxq'))['t'] or 0)
         tot_sum = ry_sum + pd_sum + nr_sum
         grand_sum += tot_sum
-        vals = [i, f"{cat.icon or ''} {cat.name}", total_cnt, patients_cnt,
+        vals = [i, f"{cat.icon or ''} {cat.name}", total_qty, patients_cnt,
                 ry_sum, pd_sum, nr_sum, tot_sum]
         al = ['center','left','center','center','right','right','right','right']
         r = _row(ws, r, vals, S, al, nums={3,4,5,6,7,8}, even=(i%2==0))
@@ -302,14 +312,19 @@ def _sheet_medicines(wb, qs, S, filter_text):
     widths = [5, 35, 10, 12, 10, 12, 16]
     r = _col_hdrs(ws, r, headers, widths, S, '7D6608')
 
+    from django.db.models import ExpressionWrapper, DecimalField, F
+    price_x_qty_med = ExpressionWrapper(
+        F('price') * F('quantity'), output_field=DecimalField()
+    )
     meds = (
         PatientMedicine.objects.filter(patient_card__in=qs)
+        .annotate(pxq=price_x_qty_med)
         .values('medicine__name', 'medicine__unit')
         .annotate(
             total_qty=Sum('quantity'),
             patients=Count('patient_card', distinct=True),
             cnt=Count('id'),
-            total_sum=Sum('price'),
+            total_sum=Sum('pxq'),        # price * quantity
         ).order_by('-total_sum')
     )
 
@@ -333,6 +348,9 @@ def _sheet_operations(wb, qs, S, filter_text):
     ncols = 10
     r = _hdr(ws, 1, "OPERATSIYALAR HISOBOTI", ncols, '512E5F')
     r = _info(ws, r, "Davr:", filter_text, ncols)
+
+    from apps.services.models import PatientService
+    from django.db.models import Sum as OSum, ExpressionWrapper, DecimalField, F
 
     headers = ['№', 'Operatsiya nomi', 'Jami soni',
                "TY soni", "Pullik soni", "Nores. soni",

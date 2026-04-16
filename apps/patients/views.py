@@ -674,25 +674,45 @@ def patient_card_edit(request, pk):
             messages.error(request, "Siz bu bemorni tahrirlay olmaysiz.")
             return redirect('patient_list')
 
-    # Qabulxona faqat ReceptionForm ishlatadi
-    is_reception = request.user.role == 'reception'
-    FormClass = ReceptionForm if is_reception else PatientCardForm
+    is_ambulatory = patient.visit_type == 'ambulatory'
+    is_reception  = request.user.role == 'reception'
+
+    # Ambulator bemor uchun ReceptionForm (soddalashtirilgan)
+    # Statsionar uchun rol ga qarab forma
+    if is_ambulatory:
+        FormClass = ReceptionForm
+    elif is_reception:
+        FormClass = ReceptionForm
+    else:
+        FormClass = PatientCardForm
 
     death_instance = getattr(patient, 'death_cause', None)
 
     if request.method == 'POST':
         form = FormClass(request.POST, instance=patient)
 
-        if is_reception:
+        if is_ambulatory or is_reception:
             if form.is_valid():
                 obj = form.save(commit=False)
-                # visit_type formada yo'q — mavjud qiymatni saqlash
-                if not obj.visit_type:
-                    obj.visit_type = patient.visit_type or 'inpatient'
+                # visit_type o'zgarmasin
+                obj.visit_type = patient.visit_type or ('ambulatory' if is_ambulatory else 'inpatient')
                 obj.save()
                 messages.success(request, "Ma'lumotlar yangilandi!")
                 return redirect('patient_list')
             else:
+                # Ambulator uchun required bo'lmagan xatolarni o'chirish
+                if is_ambulatory:
+                    skip = ['medical_record_number','resident_status','admission_date',
+                            'department','days_in_hospital','hospital_type']
+                    for f in skip:
+                        if f in form.errors:
+                            del form.errors[f]
+                    if not form.errors:
+                        obj = form.save(commit=False)
+                        obj.visit_type = 'ambulatory'
+                        obj.save()
+                        messages.success(request, "Ma'lumotlar yangilandi!")
+                        return redirect('patient_list')
                 messages.error(request, "Formada xatoliklar bor.")
         else:
             death_form = DeathCauseForm(request.POST, instance=death_instance)
@@ -733,6 +753,15 @@ def patient_card_edit(request, pk):
         if not is_reception:
             death_form = DeathCauseForm(instance=death_instance)
             surgery_formset = SurgicalOperationFormSet(instance=patient)
+
+    if is_ambulatory:
+        return render(request, 'patients/ambulatory_form.html', {
+            'form': form,
+            'title': f"Tahrirlash: {patient.full_name}",
+            'patient': patient,
+            'auto_record_number': patient.medical_record_number,
+            'now': patient.admission_date.strftime('%Y-%m-%dT%H:%M') if patient.admission_date else '',
+        })
 
     if is_reception:
         return render(request, 'patients/reception_form.html', {
@@ -1334,8 +1363,13 @@ def ambulatory_create(request):
             errors['gender'] = "Jinsni tanlang"
 
         if errors:
-            form = PatientCardForm(request.POST)
             auto_number = record_number
+            form = ReceptionForm(request.POST)
+            # Required xatolarni o'chirish
+            for field in ['medical_record_number','resident_status','admission_date',
+                          'department','days_in_hospital']:
+                if field in form.errors:
+                    del form.errors[field]
             return render(request, 'patients/ambulatory_form.html', {
                 'form': form,
                 'errors': errors,
@@ -1363,7 +1397,7 @@ def ambulatory_create(request):
     # GET
     auto_number = gen_record_number()
     now = timezone.now()
-    form = PatientCardForm()
+    form = ReceptionForm()
     return render(request, 'patients/ambulatory_form.html', {
         'form': form,
         'auto_record_number': auto_number,
