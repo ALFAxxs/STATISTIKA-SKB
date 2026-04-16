@@ -76,16 +76,13 @@
                     {% endif %}
 
 
-
-                    <!-- Statistika — reception dan tashqari -->
-                    {% if request.user.role != 'reception' %}
-                        <a href="{% url 'statistics_dashboard' %}" class="text-white text-decoration-none">
-                            📊 Statistika
-                        </a>
-                    {% endif %}
-
+                        
                     <!-- Xizmatlar statistikasi — faqat admin va statistician -->
                     {% if request.user.role == 'admin' or request.user.role == 'statistician' or request.user.is_superuser %}
+                    <a href="{% url 'statistics_dashboard' %}" class="text-white text-decoration-none">
+                            📊 Statistika
+                        </a>
+
                         <a href="{% url 'service_statistics' %}" class="text-white text-decoration-none">
                             📊 Xizmatlar statistikasi
                         </a>
