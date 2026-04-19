@@ -17,7 +17,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Sum, Q, ExpressionWrapper, DecimalField, F
 from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from django.utils import timezone
 
@@ -86,19 +86,22 @@ def patient_services(request, patient_pk):
     categories = ServiceCategory.objects.filter(is_active=True)
 
     # Moliyaviy umumlama
-    totals = services.aggregate(
-        total_sum=Sum('price'),
-        count=Count('id'),
+    from django.db.models import ExpressionWrapper, DecimalField, F as F_
+    _pxq0 = ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())
+    totals = services.annotate(_pxq=_pxq0).aggregate(
+        total_sum=Sum('_pxq'),
+        count=Sum('quantity'),
     )
     total_price = (totals['total_sum'] or 0)
 
     # Kategoriya bo'yicha umumlama
+    from django.db.models import ExpressionWrapper, DecimalField, F as F_
     cat_stats = services.values(
         'service__category__name',
         'service__category__icon',
     ).annotate(
-        count=Count('id'),
-        total=Sum('price'),
+        count=Sum('quantity'),
+        total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
     ).order_by('-total')
 
     # Barcha aktiv shifokorlar (bo'lim bo'yicha guruhlab)
@@ -206,7 +209,7 @@ def update_service(request, pk):
 
 
 @login_required
-@role_required('admin', 'doctor')
+@role_required('admin', 'doctor', 'reception')
 def delete_service(request, pk):
     """Xizmatni o'chirish"""
     ps = get_object_or_404(PatientService, pk=pk)
@@ -252,31 +255,33 @@ def service_statistics(request):
 
     # Umumiy ko'rsatkichlar
     totals = qs.aggregate(
-        total_sum=Sum('price'),
-        count=Count('id'),
-        railway_sum=Sum('price', filter=Q(patient_category_at_order='railway')),
-        nonresident_sum=Sum('price', filter=Q(
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
+        count=Sum('quantity'),
+        railway_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(patient_category_at_order='railway')),
+        nonresident_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(
             patient_category_at_order='non_resident'
         )),
     )
 
     # Kategoriya bo'yicha
+    from django.db.models import ExpressionWrapper, DecimalField, F as F_
     cat_stats = qs.values(
         'service__category__name',
         'service__category__icon',
         'service__category__id',
     ).annotate(
-        count=Count('id'),
-        total=Sum('price'),
+        count=Sum('quantity'),
+        total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
     ).order_by('-total')
 
     # Eng ko'p ishlatiladigan xizmatlar (Top 10)
+    from django.db.models import ExpressionWrapper, DecimalField, F as F_
     top_services = qs.values(
         'service__name',
         'service__category__name',
     ).annotate(
-        count=Count('id'),
-        total=Sum('price'),
+        count=Sum('quantity'),
+        total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
     ).order_by('-count')[:10]
 
     # Vaqt bo'yicha dinamika
@@ -284,22 +289,22 @@ def service_statistics(request):
         time_stats = qs.annotate(
             period=TruncDay('ordered_at')
         ).values('period').annotate(
-            count=Count('id'),
-            total=Sum('price'),
+            count=Sum('quantity'),
+            total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
         ).order_by('period')
     elif period == 'year':
         time_stats = qs.annotate(
             period=TruncYear('ordered_at')
         ).values('period').annotate(
-            count=Count('id'),
-            total=Sum('price'),
+            count=Sum('quantity'),
+            total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
         ).order_by('period')
     else:
         time_stats = qs.annotate(
             period=TruncMonth('ordered_at')
         ).values('period').annotate(
-            count=Count('id'),
-            total=Sum('price'),
+            count=Sum('quantity'),
+            total=Sum(ExpressionWrapper(F_('price') * F_('quantity'), output_field=DecimalField())),
         ).order_by('period')
 
     time_labels = [
@@ -428,9 +433,11 @@ def export_services_excel(request):
         cell.alignment = center
         cell.border = border
 
-    cat_data = qs.values('service__category__name').annotate(
-        count=Count('id'),
-        total=Sum('price'),
+    from django.db.models import ExpressionWrapper, DecimalField, F
+    _pxq_cat = ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())
+    cat_data = qs.annotate(_pxq=_pxq_cat).values('service__category__name').annotate(
+        count=Sum('quantity'),
+        total=Sum('_pxq'),
     ).order_by('-total')
 
     for i, row in enumerate(cat_data, 4):
@@ -447,10 +454,10 @@ def export_services_excel(request):
     ws3['A1'].font = Font(bold=True, size=13, color='1F4E79')
 
     totals_agg = qs.aggregate(
-        total=Sum('price'),
-        count=Count('id'),
-        railway=Sum('price', filter=Q(patient_category_at_order='railway')),
-        nonresident=Sum('price', filter=Q(
+        total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
+        count=Sum('quantity'),
+        railway=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(patient_category_at_order='railway')),
+        nonresident=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(
             patient_category_at_order='non_resident'
         )),
     )
@@ -676,9 +683,9 @@ def medicine_statistics(request):
 
     # Umumiy ko'rsatkichlar
     totals = qs.aggregate(
-        total_records=Count('id'),
+        total_records=Sum('quantity'),
         total_qty=Sum('quantity'),
-        total_sum=Sum('price'),
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
         patients=Count('patient_card', distinct=True),
     )
 
@@ -686,9 +693,9 @@ def medicine_statistics(request):
     top_medicines = (
         qs.values('medicine__name', 'medicine__unit', 'medicine_id')
         .annotate(
-            rec_count=Count('id'),
+            rec_count=Sum('quantity'),
             total_qty=Sum('quantity'),
-            total_sum=Sum('price'),
+            total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             patient_count=Count('patient_card', distinct=True),
         )
         .order_by('-total_sum')[:20]
@@ -708,7 +715,7 @@ def medicine_statistics(request):
     trend = (
         qs.annotate(period=trunc_fn('ordered_at'))
         .values('period')
-        .annotate(total=Sum('price'), qty=Sum('quantity'), cnt=Count('id'))
+        .annotate(total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())), qty=Sum('quantity'), cnt=Sum('quantity'))
         .order_by('period')
     )
     trend_labels = [t['period'].strftime(fmt) for t in trend if t['period']]
@@ -796,7 +803,7 @@ def export_medicine_excel(request):
 
     top = (
         qs.values('medicine__name', 'medicine__unit')
-        .annotate(tq=Sum('quantity'), tp=Sum('price'), pc=Count('patient_card', distinct=True))
+        .annotate(tq=Sum('quantity'), tp=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())), pc=Count('patient_card', distinct=True))
         .order_by('-tp')
     )
 
@@ -934,7 +941,7 @@ def operation_statistics(request):
         PatientService.objects
         .filter(service__category__category_type='surgery')
         .values('patient_card__patient_category')
-        .annotate(total=Sum('price'), cnt=Count('id'))
+        .annotate(total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())), cnt=Sum('quantity'))
     )
     for s in surgery_svcs:
         cat = s['patient_card__patient_category']
@@ -987,7 +994,7 @@ def operation_statistics(request):
 def export_operation_excel(request):
     """Operatsiya statistikasi Excel export"""
     from apps.patients.models import SurgicalOperation
-    from django.db.models import Count, Sum, Q
+    from django.db.models import Count, Sum, Q, ExpressionWrapper, DecimalField, F
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -1207,8 +1214,8 @@ def operation_service_statistics(request):
 
     # Umumiy ko'rsatkichlar
     totals = qs.aggregate(
-        total_count=Count('id'),
-        total_sum=Sum('price'),
+        total_count=Sum('quantity'),
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
         patients=Count('patient_card', distinct=True),
         railway_count=Count('id', filter=Q(patient_card__patient_category='railway')),
         paid_count=Count('id', filter=Q(patient_card__patient_category='paid')),
@@ -1228,8 +1235,8 @@ def operation_service_statistics(request):
             'service__category__icon',
         )
         .annotate(
-            total_count=Count('id'),
-            total_sum=Sum('price'),
+            total_count=Sum('quantity'),
+            total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             patients=Count('patient_card', distinct=True),
             railway_count=Count('id', filter=Q(patient_card__patient_category='railway')),
             paid_count=Count('id', filter=Q(patient_card__patient_category='paid')),
@@ -1246,7 +1253,7 @@ def operation_service_statistics(request):
         qs.values('service__category__name', 'service__category__icon')
         .annotate(
             count=Count('id'),
-            total=Sum('price'),
+            total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             railway=Count('id', filter=Q(patient_card__patient_category='railway')),
             paid=Count('id', filter=Q(patient_card__patient_category='paid')),
             nonresident=Count('id', filter=Q(patient_card__patient_category='non_resident')),
@@ -1258,7 +1265,7 @@ def operation_service_statistics(request):
     trend = (
         qs.annotate(month=TruncMonth('ordered_at'))
         .values('month')
-        .annotate(cnt=Count('id'), total=Sum('price'))
+        .annotate(cnt=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())))
         .order_by('month')
     )
     trend_labels = [t['month'].strftime('%Y-%m') for t in trend if t['month']]
@@ -1464,7 +1471,7 @@ def export_operation_service_excel(request):
             rc=Count('id', filter=Q(patient_card__patient_category='railway')),
             pc=Count('id', filter=Q(patient_card__patient_category='paid')),
             nc=Count('id', filter=Q(patient_card__patient_category='non_resident')),
-            total=Sum('price'),
+            total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
         )
         .order_by('-total')
     )
@@ -1566,22 +1573,22 @@ def statistics_combined(request):
         svc_qs = svc_qs.filter(service__category_id=request.GET['svc_category'])
 
     svc_totals = svc_qs.aggregate(
-        total_sum=Sum('price'),
-        count=Count('id'),
-        railway_sum=Sum('price', filter=Q(patient_category_at_order='railway')),
-        paid_sum=Sum('price', filter=Q(patient_category_at_order='paid')),
-        nonresident_sum=Sum('price', filter=Q(patient_category_at_order='non_resident')),
-        railway_count=Count('id', filter=Q(patient_category_at_order='railway')),
-        paid_count=Count('id', filter=Q(patient_category_at_order='paid')),
-        nonresident_count=Count('id', filter=Q(patient_category_at_order='non_resident')),
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
+        count=Sum('quantity'),
+        railway_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(patient_category_at_order='railway')),
+        paid_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(patient_category_at_order='paid')),
+        nonresident_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()), filter=Q(patient_category_at_order='non_resident')),
+        railway_count=Sum('quantity', filter=Q(patient_category_at_order='railway')),
+        paid_count=Sum('quantity', filter=Q(patient_category_at_order='paid')),
+        nonresident_count=Sum('quantity', filter=Q(patient_category_at_order='non_resident')),
     )
     svc_cat_stats = svc_qs.values(
         'service__category__name', 'service__category__icon', 'service__category__id'
-    ).annotate(count=Count('id'), total=Sum('price')).order_by('-total')
+    ).annotate(count=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()))).order_by('-total')
 
     top_services = svc_qs.values(
         'service__name', 'service__category__name'
-    ).annotate(count=Count('id'), total=Sum('price')).order_by('-count')[:15]
+    ).annotate(count=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField()))).order_by('-count')[:15]
 
     if period == 'day':
         from django.db.models.functions import TruncDay
@@ -1597,7 +1604,7 @@ def statistics_combined(request):
 
     svc_trend = (
         svc_qs.annotate(p=trunc_fn('ordered_at'))
-        .values('p').annotate(cnt=Count('id'), total=Sum('price'))
+        .values('p').annotate(cnt=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())))
         .order_by('p')
     )
     svc_trend_labels = [t['p'].strftime(fmt) for t in svc_trend if t['p']]
@@ -1612,23 +1619,23 @@ def statistics_combined(request):
         med_qs = med_qs.filter(medicine_id=request.GET['medicine'])
 
     med_totals = med_qs.aggregate(
-        total_records=Count('id'),
+        total_records=Sum('quantity'),
         total_qty=Sum('quantity'),
-        total_sum=Sum('price'),
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
         patients=Count('patient_card', distinct=True),
     )
     top_medicines = (
         med_qs.values('medicine__name', 'medicine__unit')
         .annotate(
-            rec_count=Count('id'),
+            rec_count=Sum('quantity'),
             total_qty=Sum('quantity'),
-            total_sum=Sum('price'),
+            total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             patient_count=Count('patient_card', distinct=True),
         ).order_by('-total_sum')[:15]
     )
     med_trend = (
         med_qs.annotate(p=TruncMonth('ordered_at'))
-        .values('p').annotate(total=Sum('price'), qty=Sum('quantity'))
+        .values('p').annotate(total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())), qty=Sum('quantity'))
         .order_by('p')
     )
     med_trend_labels = [t['p'].strftime('%Y-%m') for t in med_trend if t['p']]
@@ -1685,8 +1692,8 @@ def statistics_combined(request):
         opx_qs = opx_qs.filter(service__category_id=request.GET['opx_category'])
 
     opx_totals = opx_qs.aggregate(
-        total_count=Count('id'),
-        total_sum=Sum('price'),
+        total_count=Sum('quantity'),
+        total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
         patients=Count('patient_card', distinct=True),
         railway_count=Count('id', filter=Q(patient_card__patient_category='railway')),
         paid_count=Count('id', filter=Q(patient_card__patient_category='paid')),
@@ -1700,8 +1707,8 @@ def statistics_combined(request):
             'service__id', 'service__name', 'service__code',
             'service__category__name', 'service__category__icon',
         ).annotate(
-            total_count=Count('id'),
-            total_sum=Sum('price'),
+            total_count=Sum('quantity'),
+            total_sum=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             patients=Count('patient_card', distinct=True),
             railway_count=Count('id', filter=Q(patient_card__patient_category='railway')),
             paid_count=Count('id', filter=Q(patient_card__patient_category='paid')),
@@ -1713,7 +1720,7 @@ def statistics_combined(request):
     )
     opx_cat_stats = (
         opx_qs.values('service__category__name', 'service__category__icon')
-        .annotate(count=Count('id'), total=Sum('price'),
+        .annotate(count=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())),
             railway=Count('id', filter=Q(patient_card__patient_category='railway')),
             paid=Count('id', filter=Q(patient_card__patient_category='paid')),
             nonresident=Count('id', filter=Q(patient_card__patient_category='non_resident')),
@@ -1721,7 +1728,7 @@ def statistics_combined(request):
     )
     opx_trend = (
         opx_qs.annotate(p=TruncMonth('ordered_at'))
-        .values('p').annotate(cnt=Count('id'), total=Sum('price'))
+        .values('p').annotate(cnt=Sum('quantity'), total=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField())))
         .order_by('p')
     )
     opx_trend_labels = [t['p'].strftime('%Y-%m') for t in opx_trend if t['p']]

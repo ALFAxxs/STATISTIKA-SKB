@@ -108,7 +108,7 @@
                         {% if item.result %}<div class="text-muted small mt-1">📋 {{ item.result|truncatechars:50 }}</div>{% endif %}
                     </td>
                     <td>
-                        <span class="badge bg-secondary bg-opacity-15 text-secondary">
+                        <span style="display:inline-block;background:#e9ecef;color:#495057;border-radius:6px;padding:2px 8px;font-size:0.75rem;font-weight:500;">
                             {{ item.service.category.icon|default:"🏥" }} {{ item.service.category.name }}
                         </span>
                     </td>

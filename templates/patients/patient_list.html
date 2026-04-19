@@ -139,7 +139,12 @@
         <tbody>
             {% for patient in page_obj %}
             <tr>
-                <td class="small text-muted">{{ patient.medical_record_number }}</td>
+                <td class="small">
+                    <div class="text-muted">{{ patient.medical_record_number }}</div>
+                    {% if patient.registered_by %}
+                    <div class="text-secondary" style="font-size:0.7rem;">👤 {{ patient.registered_by.get_full_name|default:patient.registered_by.username }}</div>
+                    {% endif %}
+                </td>
 
                 <td>
                     <a href="{% url 'patient_detail' patient.pk %}" class="text-decoration-none fw-semibold">

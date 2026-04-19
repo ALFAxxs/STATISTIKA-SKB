@@ -310,6 +310,7 @@ def statistics_dashboard(request):
         'selected_referral': referral_type,
         'selected_org': org_id,
         'org_selected_name': Organization.objects.get(pk=org_id).display_name if org_id and Organization.objects.filter(pk=org_id).exists() else '',
+        'organizations': Organization.objects.filter(is_active=True).order_by('enterprise_name', 'branch_name'),
         'date_from': date_from,
         'date_to': date_to,
         'current_filters': current_filters,

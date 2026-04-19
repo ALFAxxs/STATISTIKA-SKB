@@ -449,7 +449,7 @@ def patient_card_pdf(request, pk):
 @login_required
 def patient_list(request):
     qs = PatientCard.objects.select_related(
-        'department', 'attending_doctor'
+        'department', 'attending_doctor', 'registered_by'
     ).order_by('-admission_date')
 
     # Bo'lim filteri

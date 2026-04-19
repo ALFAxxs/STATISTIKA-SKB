@@ -267,7 +267,8 @@ def sheet_orinlar_fondi(wb, qs, year, month, S_):
             for p in dqs.filter(discharge_date__isnull=False):
                 if p.admission_date and p.discharge_date:
                     ad = p.admission_date.date() if hasattr(p.admission_date, 'date') else p.admission_date
-                    total_days += max(0, (p.discharge_date - ad).days)
+                    dd = p.discharge_date.date() if hasattr(p.discharge_date, 'date') else p.discharge_date
+                    total_days += max(0, (dd - ad).days)
 
             beds = 0  # Modelda beds maydoni bo'lsa ishlatiladi
 
@@ -614,8 +615,10 @@ def sheet_xizmatlar(wb, qs, year, month, S_):
 @login_required
 def export_monthly_report(request):
     """Oylik rasmiy hisobotlar"""
-    year  = int(request.GET.get('year',  date.today().year))
-    month = int(request.GET.get('month', date.today().month))
+    year_raw  = request.GET.get('year', '').strip()
+    month_raw = request.GET.get('month', '').strip()
+    year  = int(year_raw)  if year_raw  else date.today().year
+    month = int(month_raw) if month_raw else date.today().month
 
     qs = get_filtered_queryset(request)
     if not request.GET.get('year'):
