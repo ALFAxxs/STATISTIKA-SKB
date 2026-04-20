@@ -848,7 +848,7 @@ def reception_create(request):
                 request,
                 f"✅ Bemor qabul qilindi! Bayonnoma: {patient.medical_record_number}"
             )
-            return redirect('patient_list')
+            return redirect('patient_detail', pk=patient.pk)
         else:
             messages.error(request, "Formada xatoliklar bor.")
     else:
