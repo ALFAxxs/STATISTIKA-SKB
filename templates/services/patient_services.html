@@ -148,6 +148,7 @@
 </div>
 
 <!-- ===== DORI-DARMONLAR ===== -->
+{% if patient.visit_type != 'ambulatory' %}
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <strong>💊 Dori-darmonlar</strong>
@@ -247,6 +248,7 @@
         </table>
     </div>
 </div>
+{% endif %}
 
 <!-- XIZMAT QO'SHISH MODAL -->
 <div class="modal fade" id="addServiceModal" tabindex="-1">
