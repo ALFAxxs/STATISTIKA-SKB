@@ -11,4 +11,5 @@ urlpatterns = [
     path('statistics/', include('apps.statistic.urls')),
     path('services/', include('apps.services.urls')),
     path('', include('apps.users.urls')),  # login, logout, users, access-denied
+    path('contracts/', include('apps.contracts.urls')),
 ]

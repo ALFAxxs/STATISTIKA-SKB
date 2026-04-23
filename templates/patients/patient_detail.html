@@ -6,6 +6,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>📋 Bemor kartasi</h3>
     <div class="d-flex gap-2">
+        {% if patient.contract %}
+              <a href="{% url 'download_contract' patient.contract.pk %}"
+                 class="btn btn-sm btn-primary" target="_blank">
+                 📄 Shartnoma (PDF)
+              </a>
+            {% endif %}
         <a href="{% url 'patient_services' patient.pk %}" class="btn btn-info">
             🏥 Xizmatlar
             {% with cnt=patient.patient_services.count %}

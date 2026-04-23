@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-0n=^kv0l%nu2dq)+=@y!qdgzvoonh+n3x0cby61^1z(7n_6jb*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ['164.92.130.93', 'www.markaziyklinikkasalxona-statistika.uz', 'markaziyklinikkasalxona-statistika.uz']
+ALLOWED_HOSTS = ['*']
 
 CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 
@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.patients',
     'apps.users',
     'apps.services',
+    'apps.contracts',
 ]
 
 MIDDLEWARE = [
@@ -115,7 +116,7 @@ LOGIN_REDIRECT_URL = '/patients/'
 LOGOUT_REDIRECT_URL = '/login/'
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
-
+SITE_URL = 'https://markaziyklinikkasalxona-statistika.uz'
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
