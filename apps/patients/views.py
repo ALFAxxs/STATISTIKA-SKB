@@ -491,6 +491,11 @@ def patient_list(request):
     if doctor_filter:
         qs = qs.filter(attending_doctor_id=doctor_filter)
 
+    # Registrator o'zi qo'shgan bemorlar filteri
+    my_patients = request.GET.get('my_patients', '')
+    if my_patients and request.user.role == 'reception':
+        qs = qs.filter(registered_by=request.user)
+
     # Bemor kategoriyasi filteri
     category_filter = request.GET.get('category', '')
     if category_filter:
@@ -542,6 +547,7 @@ def patient_list(request):
         'selected_date_from': date_from,
         'selected_date_to': date_to,
         'selected_per_page': per_page,
+        'my_patients': my_patients,
         'departments': departments,
         'doctors': doctors,
         'total_count': qs.count(),
@@ -699,7 +705,7 @@ def patient_card_edit(request, pk):
     if not request.user.is_superuser and request.user.role not in ('admin', 'reception'):
         if request.user.department and patient.department != request.user.department:
             messages.error(request, "Siz bu bemorni tahrirlay olmaysiz.")
-            return redirect('patient_list')
+            return redirect('patient_detail', pk=pk)
 
     is_ambulatory = patient.visit_type == 'ambulatory'
     is_reception  = request.user.role == 'reception'
@@ -725,7 +731,7 @@ def patient_card_edit(request, pk):
                 obj.visit_type = patient.visit_type or ('ambulatory' if is_ambulatory else 'inpatient')
                 obj.save()
                 messages.success(request, "Ma'lumotlar yangilandi!")
-                return redirect('patient_list')
+                return redirect('patient_detail', pk=pk)
             else:
                 # Ambulator uchun required bo'lmagan xatolarni o'chirish
                 if is_ambulatory:
@@ -739,7 +745,7 @@ def patient_card_edit(request, pk):
                         obj.visit_type = 'ambulatory'
                         obj.save()
                         messages.success(request, "Ma'lumotlar yangilandi!")
-                        return redirect('patient_list')
+                        return redirect('patient_detail', pk=pk)
                 messages.error(request, "Formada xatoliklar bor.")
         else:
             death_form = DeathCauseForm(request.POST, instance=death_instance)
@@ -772,7 +778,7 @@ def patient_card_edit(request, pk):
                     death_instance.delete()
 
                 messages.success(request, "Bemor kartasi yangilandi!")
-                return redirect('patient_list')
+                return redirect('patient_detail', pk=pk)
             else:
                 messages.error(request, "Formada xatoliklar bor.")
     else:
