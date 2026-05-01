@@ -429,6 +429,26 @@
                 </div>
             </div>
 
+            <!-- Shartnoma raqami (ixtiyoriy) -->
+            {% if form.instance.patient_category == 'paid' or form.instance.patient_category == 'non_resident' %}
+            {% endif %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-2">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold mb-1">
+                                📄 Shartnoma raqami
+                                <span class="text-muted fw-normal">(ixtiyoriy — bo'sh qoldirilsa avtomatik belgilanadi)</span>
+                            </label>
+                            <input type="text" name="manual_contract_number"
+                                   class="form-control form-control-sm"
+                                   placeholder="Masalan: SHA-2026-0005"
+                                   maxlength="30">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tugmalar -->
             <div class="d-flex gap-2 mb-5">
                 <button type="submit" class="btn btn-primary btn-lg">✅ Qabul qilish</button>

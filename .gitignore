@@ -58,4 +58,5 @@ db.sqlite3_org_archive
 skb_stat.zip
 .zip
 .xlsx
-skb_stat/
+conf/settings.py
+contracts

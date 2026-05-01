@@ -11,7 +11,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
-    TableStyle, HRFlowable, Image
+    TableStyle, HRFlowable, Image, KeepTogether, PageBreak
 )
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
@@ -19,15 +19,22 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 
 def _register_fonts():
+    # O'zbek harflarini qo'llab-quvvatlaydigan fontlar (ustuvorlik tartibi)
     font_paths = [
-        "C:/Windows/Fonts/times.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
+        # Linux - DejaVuSerif (o'zbek harflari to'liq qo'llab-quvvatlanadi)
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+        # Windows
+        "C:/Windows/Fonts/times.ttf",
+        "C:/Windows/Fonts/arial.ttf",
     ]
     bold_paths = [
-        "C:/Windows/Fonts/timesbd.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+        "C:/Windows/Fonts/timesbd.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
     ]
     reg  = next((p for p in font_paths if os.path.exists(p)), None)
     bold = next((p for p in bold_paths if os.path.exists(p)), None)
@@ -63,7 +70,7 @@ def generate_contract_pdf(contract) -> bytes:
         str(patient.city)     if patient.city     else '',
         patient.street_address or '',
     ]
-    full_address = ', '.join(p for p in address_parts if p) or '—'
+    full_address = ', '.join(p for p in address_parts if p) or '-'
 
     from django.conf import settings
     base_url   = getattr(settings, 'SITE_URL', 'https://markaziyklinikkasalxona-statistika.uz')
@@ -106,7 +113,7 @@ def generate_contract_pdf(contract) -> bytes:
         p(f"Toshkent sh. {'&nbsp;'*80} <u>{cd}</u>", sL),
         sp(3),
         p(f'<b>"Temir yo`l ijtimoiy xizmatlar" MCHJ Markaziy klinik kasalxona filiali</b> '
-          f'Nizomi asosida ish yurituvchi direktor I.K.Yangiboyev vakili sifatida bir tomondan, '
+          f'Ishonchnoma asosida ish yurituvchi direktor I.K.Yangiboyev nomidan '
           f'keyingi o`rinlarda <b>"Ijrochi"</b> deb ataladi, va'),
         sp(2),
         p(f'<u>{full_address}</u>', sC),
@@ -136,7 +143,7 @@ def generate_contract_pdf(contract) -> bytes:
             "Shartnoma tuzilgan kundan qat'iy nazar, bo'sh joylar mavjud bo'lgan taqdirda tibbiy amaliyotni yuqori saviyada amalga oshirish.",
             "Foydalanilmagan mablag'larni bemorga qaytarish.",
             "Tibbiy xizmatlar, dori-darmonlar uchun hisob-fakturani taqdim etish.",
-            "Xizmatlarni qabul qilish dalolatnomасini o'z vaqtida tuzish va imzolash.",
+            "Xizmatlarni qabul qilish dalolatnomasini o'z vaqtida tuzish va imzolash.",
             "Bemorning sog'ligi haqidagi tibbiy sirlarni oshkor qilmaslik.",
         ]),
         ('"Ijrochi" quyidagi huquqlarga ega:', [
@@ -156,7 +163,7 @@ def generate_contract_pdf(contract) -> bytes:
     ]:
         story.append(p(f'&nbsp;&nbsp;&nbsp;&nbsp;<b>{side}</b>'))
         for item in items:
-            story.append(p(f'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— {item}'))
+            story.append(p(f'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- {item}'))
         story.append(sp(1))
 
     # 4-7 bandlar
@@ -227,18 +234,14 @@ def generate_contract_pdf(contract) -> bytes:
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
-    story.append(sign_table)
-    story.append(sp(6))
-
-    # QR kod
+    # Imzo + QR blokni bitta sahifada saqlash
     qr_buf = generate_qr_code_image(verify_url)
     qr_img = Image(qr_buf, width=25*mm, height=25*mm)
     qr_table = Table([[
         qr_img,
         Paragraph(
-            f"<b>Shartnomani onlayn ko'rish yoki yuklab olish:</b><br/>"
-            f'<font color="#1a73e8">{verify_url}</font><br/><br/>'
-            f'Shartnoma № {contract.contract_number} | Sana: {cd}',
+            f"<b>Shartnomani onlayn tekshirish uchun QR kodni skaner qiling</b><br/><br/>"
+            f"Shartnoma No. {contract.contract_number} | Sana: {cd}",
             sQ
         ),
     ]], colWidths=[30*mm, W-30*mm])
@@ -251,7 +254,13 @@ def generate_contract_pdf(contract) -> bytes:
         ('TOPPADDING', (0,0), (-1,-1), 6),
         ('BOTTOMPADDING', (0,0), (-1,-1), 6),
     ]))
-    story.append(qr_table)
+
+    # Imzo jadvali va QR kodni bitta blokda saqlash — ajralmasin
+    story.append(KeepTogether([
+        sign_table,
+        sp(6),
+        qr_table,
+    ]))
 
     doc.build(story)
     return buf.getvalue()

@@ -19,6 +19,16 @@
     .svc-item:hover { background: #e8f4fd; }
     .svc-item:last-child { border-bottom: none; }
     .price-pill { background: #198754; color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .svc-item-row { display:flex; align-items:center; gap:8px; }
+    .svc-cb { width:16px; height:16px; cursor:pointer; flex-shrink:0; accent-color:#185FA5; }
+    .svc-qty-inline { width:52px; padding:2px 6px; font-size:12px; border:1px solid #dee2e6; border-radius:4px; text-align:center; }
+    .svc-item-info { flex:1; min-width:0; }
+    .svc-item-info .svc-name { font-size:13px; font-weight:600; color:#212529; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .svc-item-info .svc-cat  { font-size:11px; color:#6c757d; }
+    .svc-item.selected-item { background:#e0f2fe !important; }
+    .btn-add-checked { width:100%; background:#185FA5; color:#fff; border:none; padding:9px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; display:none; }
+    .btn-add-checked:hover { background:#0C447C; }
+    .checked-summary { font-size:12px; color:#185FA5; font-weight:500; padding:6px 12px; background:#e0f2fe; border-radius:6px; margin-top:6px; display:none; }
     .cart-table th { font-size: 13px; }
     .cart-table td { font-size: 13px; vertical-align: middle; }
     .cart-empty { color: #adb5bd; font-style: italic; }
@@ -301,7 +311,11 @@
                                     <label class="form-label small fw-bold mb-1">Izoh</label>
                                     <textarea id="svc-notes" class="form-control form-control-sm" rows="2"></textarea>
                                 </div>
-                                <button type="button" class="btn btn-primary w-100" id="btn-add-to-cart">➕ Savatga qo'shish</button>
+                                <div class="checked-summary" id="checked-summary">✅ <span id="checked-count">0</span> ta xizmat belgilandi</div>
+                                <button type="button" class="btn-add-checked" id="btn-add-checked">➕ Belgilanganlarni savatga qo'shish</button>
+                                <hr class="my-2">
+                                <div class="text-muted small mb-1">Yoki bitta xizmat:</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn-add-to-cart">➕ Tanlangan xizmatni qo'shish</button>
                                 <div id="add-cart-error" class="alert alert-danger mt-2 py-2" style="display:none;"></div>
                             </div>
                         </div>
@@ -344,6 +358,66 @@
                 <button type="button" class="btn btn-success btn-lg px-5" id="btn-save-all" disabled>
                     ✅ Barchasini saqlash (<span id="save-count">0</span> ta)
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MRT NAVBAT MODAL -->
+<div class="modal fade" id="queueModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">🏥 MRT Navbat Yaratildi</h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div style="font-size:90px; font-weight:900; color:#185FA5; line-height:1;" id="modal-queue-number">—</div>
+                <div class="text-muted mt-2 mb-3">Navbat raqami</div>
+                <div class="fw-semibold fs-5" id="modal-patient-name"></div>
+                <div class="alert alert-info py-2">
+                    📢 Bemorga navbat raqamini ayting — u MRT zalida ekrandan o'z navbatini kuzatishi mumkin
+                </div>
+                <div class="text-muted small">MRT xonasi • Bugun</div>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-outline-secondary px-4" id="btn-print-ticket">
+                    🖨 Chop etish
+                </button>
+                <button type="button" class="btn btn-primary px-5" id="queue-modal-ok">
+                    ✅ Tushunarli
+                </button>
+            </div>
+
+            <!-- Termoprinter uchun chop etish stili -->
+            <div id="print-ticket" style="display:none; position:absolute; left:-9999px;">
+                <style>
+                @media print {
+                    body * { visibility: hidden !important; }
+                    #print-ticket, #print-ticket * { visibility: visible !important; }
+                    #print-ticket {
+                        position: fixed !important;
+                        top: 0 !important; left: 0 !important;
+                        width: 76mm !important;
+                        padding: 4mm !important;
+                        font-family: 'Courier New', monospace !important;
+                        font-size: 12pt !important;
+                    }
+                }
+                </style>
+                <div style="text-align:center; font-family:'Courier New',monospace; width:76mm; padding:4mm;">
+                    <div style="font-size:10pt; border-bottom:1px dashed #000; padding-bottom:3mm; margin-bottom:3mm;">
+                        Markaziy klinik kasalxona<br>MRT bo'limi
+                    </div>
+                    <div style="font-size:11pt; margin-bottom:2mm;">Navbat raqami</div>
+                    <div id="print-num" style="font-size:48pt; font-weight:900; line-height:1;">—</div>
+                    <div style="font-size:9pt; margin-top:3mm; border-top:1px dashed #000; padding-top:3mm;">
+                        MRT xonasi
+                    </div>
+                    <div id="print-date" style="font-size:8pt; color:#333;"></div>
+                    <div style="font-size:7pt; margin-top:3mm; border-top:1px dashed #000; padding-top:2mm;">
+                        Navbat kelguncha kuting.<br>Ekrandan raqamingizni kuzating.
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -417,6 +491,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== SAVAT =====
     let cart = [];
     let selId = null, selName = '', selPrice = 0;
+    let checkedItems = new Set();
+    let checkedQtys  = {};
+
+    function updateCheckedSummary() {
+        const n = checkedItems.size;
+        const summary = document.getElementById('checked-summary');
+        const btn = document.getElementById('btn-add-checked');
+        if (document.getElementById('checked-count')) document.getElementById('checked-count').textContent = n;
+        if (summary) summary.style.display = n > 0 ? 'block' : 'none';
+        if (btn) btn.style.display = n > 0 ? 'block' : 'none';
+    }
     // FIX 2: selCatName to'g'ri e'lon qilindi
     let selCatName = '';
 
@@ -474,27 +559,65 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(r => r.json())
             .then(data => {
                 if (!data.length) { svcDropdown.innerHTML = '<div class="svc-item text-muted">🔍 Topilmadi</div>'; return; }
-                svcDropdown.innerHTML = data.map(s =>
-                    `<div class="svc-item" data-id="${s.id}"
-                          data-name="${s.name.replace(/"/g,'&quot;')}"
-                          data-cat="${s.category}"
-                          data-price="${s.price}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div><span class="fw-semibold">${s.name}</span><span class="text-muted small ms-2">${s.category}</span></div>
+                svcDropdown.innerHTML = data.map(s => {
+                    const checked = checkedItems.has(s.id);
+                    const qty = checkedQtys[s.id] || 1;
+                    return `<div class="svc-item ${checked ? 'selected-item' : ''}" data-id="${s.id}" data-name="${s.name.replace(/"/g,'&quot;')}" data-cat="${s.category}" data-price="${s.price}">
+                        <div class="svc-item-row">
+                            <input type="checkbox" class="svc-cb" data-id="${s.id}" ${checked ? 'checked' : ''}>
+                            <div class="svc-item-info">
+                                <div class="name">${s.name}</div>
+                                <div class="cat">${s.category}</div>
+                            </div>
+                            <input type="number" class="svc-qty-inline" value="${qty}" min="1" max="99" data-id="${s.id}">
                             <span class="price-pill">${Number(s.price).toLocaleString()} so'm</span>
                         </div>
-                    </div>`
-                ).join('');
+                    </div>`;
+                }).join('');
+
+                // Checkbox eventi
+                svcDropdown.querySelectorAll('.svc-cb').forEach(cb => {
+                    cb.addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        const item = this.closest('.svc-item');
+                        if (this.checked) {
+                            checkedItems.add(id);
+                            item.classList.add('selected-item');
+                            // Bitta xizmat uchun ham tanlash
+                            selId = id; selName = item.dataset.name;
+                            selPrice = parseFloat(item.dataset.price);
+                            selCatName = item.dataset.cat;
+                            svcSearch.value = selName;
+                            svcPriceEl.textContent = selPrice.toLocaleString() + " so'm";
+                        } else {
+                            checkedItems.delete(id);
+                            delete checkedQtys[id];
+                            item.classList.remove('selected-item');
+                        }
+                        updateCheckedSummary();
+                    });
+                });
+
+                // Miqdor o'zgartirish
+                svcDropdown.querySelectorAll('.svc-qty-inline').forEach(inp => {
+                    inp.addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        checkedQtys[this.dataset.id] = parseInt(this.value) || 1;
+                        if (checkedItems.has(this.dataset.id)) {
+                            document.getElementById('svc-qty').value = this.value;
+                        }
+                    });
+                    inp.addEventListener('click', e => e.stopPropagation());
+                });
+
+                // Item bosish — checkbox ni toggle qiladi
                 svcDropdown.querySelectorAll('.svc-item').forEach(item => {
-                    item.addEventListener('click', function () {
-                        selId      = this.dataset.id;
-                        selName    = this.dataset.name;
-                        selPrice   = parseFloat(this.dataset.price);
-                        selCatName = this.dataset.cat;
-                        svcSearch.value = selName;
-                        svcPriceEl.textContent = `${selPrice.toLocaleString()} so'm`;
-                        svcDropdown.style.display = 'none';
-                        document.getElementById('svc-qty').focus();
+                    item.addEventListener('click', function(e) {
+                        if (e.target.classList.contains('svc-cb') || e.target.classList.contains('svc-qty-inline')) return;
+                        const cb = this.querySelector('.svc-cb');
+                        cb.checked = !cb.checked;
+                        cb.dispatchEvent(new Event('change'));
                     });
                 });
             })
@@ -549,6 +672,47 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cart.length && confirm('Savatni tozalashni tasdiqlaysizmi?')) { cart = []; renderCart(); }
     });
 
+    // Belgilanganlarni savatga qo'shish
+    document.getElementById('btn-add-checked').addEventListener('click', function() {
+        const doctorId = document.getElementById('svc-doctor').value;
+        const notes    = document.getElementById('svc-notes').value;
+        let added = 0;
+
+        svcDropdown.querySelectorAll('.svc-item').forEach(item => {
+            const id = item.dataset.id;
+            if (!checkedItems.has(id)) return;
+            const name  = item.dataset.name;
+            const price = parseFloat(item.dataset.price);
+            const cat   = item.dataset.cat;
+            const qty   = checkedQtys[id] || 1;
+            const existing = cart.find(c => c.id === id && c.doctor_id === doctorId);
+            if (existing) { existing.qty += qty; }
+            else { cart.push({ id, name, category: cat, price, qty, doctor_id: doctorId, notes }); }
+            added++;
+        });
+
+        if (added > 0) {
+            renderCart();
+            checkedItems.clear();
+            checkedQtys = {};
+            updateCheckedSummary();
+            fetchSvc(svcSearch.value);
+
+            const errDiv = document.getElementById('add-cart-error');
+            errDiv.className = 'alert alert-success mt-2 py-2';
+            errDiv.textContent = '✅ ' + added + ' ta xizmat savatga qo\'shildi!';
+            errDiv.style.display = 'block';
+            setTimeout(() => { errDiv.style.display = 'none'; errDiv.className = 'alert alert-danger mt-2 py-2'; }, 2000);
+        }
+    });
+
+    // Modal yopilganda tozalash
+    document.getElementById('addServiceModal').addEventListener('hidden.bs.modal', function() {
+        checkedItems.clear();
+        checkedQtys = {};
+        updateCheckedSummary();
+    });
+
     // ===== BARCHASINI SAQLASH =====
     document.getElementById('btn-save-all').addEventListener('click', async function () {
         const errDiv = document.getElementById('save-error');
@@ -556,6 +720,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!cart.length) return;
         this.disabled = true;
         let saved = 0, failed = 0;
+        const queueNumbers = [];
+        let patientNameFromResponse = '';
         for (let i = 0; i < cart.length; i++) {
             const item = cart[i];
             try {
@@ -565,13 +731,97 @@ document.addEventListener('DOMContentLoaded', function () {
                     body: JSON.stringify({ service_id: item.id, quantity: item.qty, ordered_by_id: item.doctor_id || null, notes: item.notes || '' })
                 });
                 const data = await res.json();
-                if (data.success) saved++; else failed++;
+                if (data.success) {
+                    saved++;
+                    // MRT navbat bo'lsa (yangi yoki mavjud)
+                    if (data.queue_number && !queueNumbers.includes(data.queue_number)) {
+                        queueNumbers.push(data.queue_number);
+                        if (data.patient_name) patientNameFromResponse = data.patient_name;
+                    }
+                } else failed++;
             } catch { failed++; }
             this.innerHTML = `⏳ Saqlanmoqda... (${saved + failed}/${cart.length})`;
         }
-        if (failed === 0) { window.location.reload(); }
+        if (failed === 0) {
+            // MRT navbat bo'lsa modal ko'rsatish
+            if (queueNumbers.length > 0) {
+                // Bemor ismini olish
+                const patientNameEl = document.querySelector('.patient-full-name') ||
+                                      document.querySelector('h4, h5, .card-title');
+                const patientName = patientNameEl ? patientNameEl.textContent.trim() : '';
+                showQueueModal(queueNumbers, patientNameFromResponse || patientName);
+            } else {
+                window.location.reload();
+            }
+        }
         else { errDiv.textContent = `${saved} ta saqlandi, ${failed} ta xato.`; errDiv.style.display = 'block'; this.disabled = false; this.innerHTML = `✅ Barchasini saqlash (<span id="save-count">${cart.length}</span> ta)`; }
     });
+
+    function printQueueTicket() {
+        const ticket = document.getElementById('print-ticket');
+        const orig = document.body.innerHTML;
+        document.body.innerHTML = ticket.innerHTML;
+        window.print();
+        document.body.innerHTML = orig;
+        window.location.reload();
+    }
+
+    function showQueueModal(numbers, patientName) {
+        const num = numbers.join(', ');
+        document.getElementById('modal-queue-number').textContent = num;
+        if (patientName) document.getElementById('modal-patient-name').textContent = patientName;
+        // Print ticket yangilash
+        document.getElementById('print-num').textContent = num;
+        document.getElementById('print-date').textContent =
+            new Date().toLocaleDateString('uz-UZ') + ' ' +
+            new Date().toLocaleTimeString('uz-UZ', {hour:'2-digit', minute:'2-digit'});
+        // print-ticket faqat chop etishda ko'rinadi
+
+        const modal = new bootstrap.Modal(document.getElementById('queueModal'));
+        modal.show();
+        document.getElementById('btn-print-ticket').onclick = function() {
+            const num  = document.getElementById('modal-queue-number').textContent;
+            const name = document.getElementById('modal-patient-name').textContent;
+            const date = document.getElementById('print-date').textContent;
+
+            // Inline iframe orqali chop etish
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:80mm;';
+            document.body.appendChild(iframe);
+            const doc = iframe.contentWindow.document;
+            doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                @page { margin:0; size:80mm auto; }
+                body { font-family:'Courier New',monospace; width:76mm; padding:4mm; text-align:center; }
+                .title { font-size:9pt; border-bottom:1px dashed #000; padding-bottom:3mm; margin-bottom:3mm; }
+                .name  { font-size:10pt; font-weight:bold; margin-bottom:2mm; }
+                .label { font-size:9pt; margin-bottom:1mm; }
+                .number{ font-size:52pt; font-weight:900; line-height:1; margin:2mm 0; }
+                .divider{ border-top:1px dashed #000; margin:3mm 0; padding-top:3mm; font-size:8pt; }
+                .note  { font-size:7pt; margin-top:2mm; }
+            </style>
+            </head><body>
+                <div class="title">Markaziy klinik kasalxona<br>MRT bo'limi</div>
+                <div class="name">${name}</div>
+                <div class="label">Navbat raqami</div>
+                <div class="number">${num}</div>
+                <div class="divider">MRT xonasi<br>${date}</div>
+                <div class="note">Navbat kelguncha kuting.<br>Ekrandan raqamingizni kuzating.</div>
+            </body></html>`);
+            doc.close();
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                setTimeout(() => document.body.removeChild(iframe), 1000);
+            }, 300);
+        };
+        document.getElementById('queue-modal-ok').onclick = function() {
+            // print-ticket yashirin qoladi
+            modal.hide();
+            window.location.reload();
+        };
+    }
 
     document.getElementById('addServiceModal').addEventListener('shown.bs.modal', function () {
         cart = []; renderCart();
